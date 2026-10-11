@@ -7,8 +7,13 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [x] Define hybrid Core + stdio + HTTP architecture.
 - [x] Establish agent documentation and C# rules.
 - [x] Establish skills structure.
-- [ ] Align existing project names/configuration with the documented boundaries.
-- [ ] Establish baseline build/test CI.
+- [ ] Validate the existing three-project structure against the documented architecture.
+- [ ] Verify `libpjsua2maui.mcp` has no ASP.NET host dependency.
+- [ ] Verify stdio and HTTP projects reference the shared Core project.
+- [ ] Verify host projects contain only composition and transport concerns.
+- [ ] Verify target frameworks and package metadata.
+- [ ] Preserve the established lowercase project naming convention; do not rename projects solely to satisfy .NET naming conventions.
+- [x] Establish baseline build/test CI.
 
 ## Phase 1 — Package ingestion
 
@@ -50,9 +55,9 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [ ] Add comprehensive Core tests and fixtures.
 - [ ] Add stdio protocol tests.
 - [ ] Add HTTP transport tests.
-- [ ] Add Docker build/verification workflow.
-- [ ] Publish versioned GHCR images.
-- [ ] Publish versioned dotnet-tool package.
+- [x] Add Docker build/verification workflow.
+- [x] Publish versioned GHCR images.
+- [x] Publish versioned dotnet-tool package.
 - [ ] Document agent configuration examples.
 
 ## Phase 6 — Advanced accuracy
