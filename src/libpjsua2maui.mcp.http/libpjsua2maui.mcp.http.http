@@ -1,0 +1,6 @@
+@libpjsua2maui.mcp.http_HostAddress = http://localhost:5274
+
+GET {{libpjsua2maui.mcp.http_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

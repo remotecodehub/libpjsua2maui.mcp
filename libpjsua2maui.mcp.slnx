@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/libpjsua2maui.mcp.http/libpjsua2maui.mcp.http.csproj" />
+    <Project Path="src/libpjsua2maui.mcp.stdio/libpjsua2maui.mcp.stdio.csproj" />
+    <Project Path="src/libpjsua2maui.mcp/libpjsua2maui.mcp.csproj" />
+  </Folder>
+</Solution>
