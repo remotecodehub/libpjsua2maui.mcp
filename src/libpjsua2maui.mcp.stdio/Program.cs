@@ -5,6 +5,21 @@ using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 using libpjsua2maui.mcp.stdio.Commands;
 
+if (args.Length > 0)
+{
+    // CLI commands are separate from the MCP stdio protocol and may write to stdout.
+    var commandServices = new ServiceCollection();
+    commandServices.AddSingleton<StdioHealthCheckService>();
+    commandServices.AddSingleton<HealthCheckCommand>();
+
+    using var commandProvider = commandServices.BuildServiceProvider();
+
+    var rootCommand = new RootCommand("Local stdio MCP server for libpjsua2maui.");
+    rootCommand.Subcommands.Add(commandProvider.GetRequiredService<HealthCheckCommand>().CreateCommand());
+
+    return await rootCommand.Parse(args).InvokeAsync();
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.Logging.ClearProviders();
@@ -14,23 +29,13 @@ builder.Logging.AddConsole(options =>
     options.LogToStandardErrorThreshold = LogLevel.Trace;
 });
 
+builder.Services.AddSingleton<StdioHealthCheckService>();
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
     .WithToolsFromAssembly();
 
-builder.Services.AddSingleton<StdioHealthCheckService>();
-builder.Services.AddSingleton<HealthCheckCommand>();
-
 using var host = builder.Build();
-
-if (args.Length > 0)
-{
-    var rootCommand = new RootCommand("Local stdio MCP server for libpjsua2maui.");
-    rootCommand.Subcommands.Add(host.Services.GetRequiredService<HealthCheckCommand>().CreateCommand());
-
-    return await rootCommand.Parse(args).InvokeAsync();
-}
 
 await host.RunAsync();
 
