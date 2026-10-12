@@ -26,11 +26,15 @@ The MCP is a knowledge/query service, not a runtime replacement for pjproject. I
 
 - Keep the shared MCP implementation in `src/libpjsua2maui.mcp`.
 - Keep transport/hosting concerns in `src/libpjsua2maui.mcp.stdio` and `src/libpjsua2maui.mcp.http`.
+- Keep all tests in `tests/libpjsua2maui.mcp.tests`.
+- Organize tests into `MCP`, `Http`, and `Stdio` top-level folders matching the production boundaries.
+- Keep fixtures, mocks, fakes, stubs, and helpers under the `TestSupport` folder of the test area they serve.
 - Do not duplicate MCP tools, resources, indexing, package inspection, or domain rules between hosts.
 - Keep the core transport-agnostic and testable.
 - Treat MCP protocol handling and ordinary REST concerns as transport/host concerns; do not turn the knowledge core into an ASP.NET dependency.
 - Version all package-derived knowledge. Never silently mix symbols from different package versions.
 - Prefer deterministic, structured results with source/provenance metadata.
+- Production projects must never reference the test project.
 
 ## C# implementation rules
 
@@ -50,7 +54,7 @@ The MCP is a knowledge/query service, not a runtime replacement for pjproject. I
 
 ## Testing and validation
 
-Every implementation stage must build the solution and run the relevant tests. Add unit tests for core behavior before relying on host-level tests. Validate both hosts when transport code changes. Do not claim support for a platform, package version, MCP feature, or native symbol without evidence.
+Every implementation stage must build the solution and run the relevant tests. Add unit tests for core behavior before relying on host-level tests. Validate both hosts when transport code changes. Keep test fixtures and doubles isolated by test area. Do not claim support for a platform, package version, MCP feature, or native symbol without evidence.
 
 ## Git discipline
 
