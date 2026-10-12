@@ -3,18 +3,9 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
-builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
+
 var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-app.UseHttpsRedirection();
-app.UseAuthorization();
 
 app.MapHealthChecks("api/health", new HealthCheckOptions
 {
@@ -41,6 +32,4 @@ app.MapHealthChecks("api/health", new HealthCheckOptions
     }
 });
 
-app.MapControllers();
 app.Run();
-
