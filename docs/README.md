@@ -4,11 +4,11 @@ This directory is the project-level guidance for architecture, implementation, M
 
 ## Documents
 
-- `architecture.md` — boundaries, responsibilities, data flow, and hybrid hosting model.
+- `architecture.md` — boundaries, responsibilities, data flow, hybrid hosting, and test project organization.
 - `development-guidelines.md` — coding, testing, dependency, documentation, and review rules.
 - `mcp-design.md` — intended MCP tools/resources and version-aware knowledge model.
 - `package-knowledge.md` — how knowledge is extracted from the published NuGet package and related pjproject/SWIG sources.
-- `testing.md` — validation strategy for the shared core and both transports.
+- `testing.md` — test project organization and validation strategy for the shared core and both transports.
 - `release.md` — NuGet/dotnet-tool and Docker/GHCR release expectations.
 - `roadmap.md` — ordered implementation phases and completion criteria.
 
