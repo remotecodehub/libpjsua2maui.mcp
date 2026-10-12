@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
+using libpjsua2maui.mcp.stdio;
 using libpjsua2maui.mcp.stdio.Commands;
 
 if (args.Length > 0)
