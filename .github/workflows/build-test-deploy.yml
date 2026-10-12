@@ -45,7 +45,14 @@ jobs:
         
       - name: Test
         run: dotnet test "${{ env.SOLUTION }}" --configuration Release --no-restore --no-build
-
+        
+      - name: Publish Test Summary
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: 'Continuous Test Results'
+          path: './TestResults/*.trx'
+          reporter: 'dotnet-trx'
   docker:
     name: Build HTTP Docker image
     runs-on: ubuntu-latest

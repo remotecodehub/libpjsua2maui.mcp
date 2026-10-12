@@ -43,7 +43,7 @@ public sealed class HttpHostIntegrationTests
             transport,
             cancellationToken: TestContext.Current.CancellationToken);
 
-        var tools = await client.ListToolsAsync(TestContext.Current.CancellationToken);
+        var tools = await client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Contains(tools, tool => tool.Name == "healthcheck");
 
