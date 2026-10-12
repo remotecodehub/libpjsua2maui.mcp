@@ -20,11 +20,15 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [x] Implement DI-based stdio host startup using the official MCP SDK and stdio transport.
 - [x] Route stdio host logs to stderr so stdout remains reserved for MCP protocol messages.
 - [x] Add a `healthcheck` CLI command that reports status, transport, and version as JSON.
-- [x] Expose the stdio host health check as an MCP tool.
+- [x] Expose one shared `healthcheck` MCP tool from the Core project for both transports.
+- [x] Implement the HTTP MCP Streamable HTTP endpoint at `/mcp`.
+- [x] Preserve the HTTP health endpoint at `/api/health`.
 - [x] Add a unit test for the stdio health-check service.
+- [x] Add a process-level test for CLI healthcheck output and exit code.
+- [x] Add stdio MCP protocol integration coverage for initialization, tool discovery, and invocation.
+- [x] Add HTTP host integration coverage for `/api/health`.
+- [x] Add HTTP MCP protocol integration coverage for initialization, tool discovery, and invocation.
 - [ ] Run the updated solution build and complete test suite successfully.
-- [ ] Add/run a stdio process-level test for CLI healthcheck output and exit code.
-- [ ] Add/run a protocol-level test proving MCP initialization and `healthcheck` tool discovery/invocation.
 - [ ] Confirm the latest GitHub Actions build/test run succeeds after these changes.
 
 ## Phase 1 — Package ingestion
@@ -56,21 +60,19 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ## Phase 4 — Hosts
 
-- [ ] Implement stdio MCP host.
 - [ ] Package stdio host as a dotnet tool.
-- [ ] Implement HTTP MCP host using the shared Core.
 - [ ] Containerize HTTP host.
 - [ ] Add health/readiness behavior where useful.
 
 ## Phase 5 — Validation and release
 
 - [ ] Add comprehensive Core tests and fixtures.
-- [ ] Add stdio protocol tests.
-- [ ] Add HTTP transport tests.
+- [ ] Document agent configuration examples.
+- [x] Add stdio protocol tests.
+- [x] Add HTTP transport tests.
 - [x] Add Docker build/verification workflow.
 - [x] Publish versioned GHCR images.
 - [x] Publish versioned dotnet-tool package.
-- [ ] Document agent configuration examples.
 
 ## Phase 6 — Advanced accuracy
 

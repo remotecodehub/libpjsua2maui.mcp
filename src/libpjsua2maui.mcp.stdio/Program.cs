@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
+using libpjsua2maui.mcp;
 using libpjsua2maui.mcp.stdio;
 using libpjsua2maui.mcp.stdio.Commands;
 
@@ -31,10 +32,13 @@ builder.Logging.AddConsole(options =>
 });
 
 builder.Services.AddSingleton<StdioHealthCheckService>();
+builder.Services.AddSingleton<IMcpHostHealthCheckService>(
+    serviceProvider => serviceProvider.GetRequiredService<StdioHealthCheckService>());
+
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
-    .WithToolsFromAssembly();
+    .WithTools<HealthCheckTool>();
 
 using var host = builder.Build();
 
