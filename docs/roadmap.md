@@ -7,16 +7,25 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [x] Define hybrid Core + stdio + HTTP architecture.
 - [x] Establish agent documentation and C# rules.
 - [x] Establish skills structure.
-- [ ] Validate the existing three-project structure against the documented architecture.
-- [ ] Verify `libpjsua2maui.mcp` has no ASP.NET host dependency.
-- [ ] Verify stdio and HTTP projects reference the shared Core project.
-- [ ] Verify host projects contain only composition and transport concerns.
-- [ ] Verify target frameworks and package metadata.
-- [ ] Preserve the established lowercase project naming convention; do not rename projects solely to satisfy .NET naming conventions.
+- [x] Validate the existing three-project structure against the documented architecture.
+- [x] Verify `libpjsua2maui.mcp` has no direct ASP.NET host dependency.
+- [x] Verify stdio and HTTP projects reference the shared Core project.
+- [x] Keep host projects focused on startup, dependency composition, health checks, and transport concerns.
+- [x] Verify target frameworks and package metadata use .NET 10 and consistent host versions.
+- [x] Preserve the established lowercase project naming convention; do not rename projects solely to satisfy .NET naming conventions.
 - [x] Add the dedicated .NET test project covering Core, HTTP, and stdio.
 - [x] Establish the `MCP`, `Http`, and `Stdio` test-area organization.
 - [x] Define per-area `TestSupport` organization for fixtures, mocks, fakes, stubs, and helpers.
 - [x] Establish baseline build/test CI.
+- [x] Implement DI-based stdio host startup using the official MCP SDK and stdio transport.
+- [x] Route stdio host logs to stderr so stdout remains reserved for MCP protocol messages.
+- [x] Add a `healthcheck` CLI command that reports status, transport, and version as JSON.
+- [x] Expose the stdio host health check as an MCP tool.
+- [x] Add a unit test for the stdio health-check service.
+- [ ] Run the updated solution build and complete test suite successfully.
+- [ ] Add/run a stdio process-level test for CLI healthcheck output and exit code.
+- [ ] Add/run a protocol-level test proving MCP initialization and `healthcheck` tool discovery/invocation.
+- [ ] Confirm the latest GitHub Actions build/test run succeeds after these changes.
 
 ## Phase 1 — Package ingestion
 
