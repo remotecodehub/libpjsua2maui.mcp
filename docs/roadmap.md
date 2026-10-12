@@ -13,6 +13,9 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [ ] Verify host projects contain only composition and transport concerns.
 - [ ] Verify target frameworks and package metadata.
 - [ ] Preserve the established lowercase project naming convention; do not rename projects solely to satisfy .NET naming conventions.
+- [x] Add the dedicated .NET test project covering Core, HTTP, and stdio.
+- [x] Establish the `MCP`, `Http`, and `Stdio` test-area organization.
+- [x] Define per-area `TestSupport` organization for fixtures, mocks, fakes, stubs, and helpers.
 - [x] Establish baseline build/test CI.
 
 ## Phase 1 — Package ingestion
