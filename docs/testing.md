@@ -45,11 +45,11 @@ Test that every tool has a stable schema, validates required inputs, returns det
 
 ## stdio host
 
-Run the actual executable and verify MCP initialization, tool/resource discovery, request/response flow, cancellation where applicable, and offline operation against a known local knowledge set.
+Run the actual executable as a child process and verify MCP initialization, tool/resource discovery, request/response flow, cancellation where applicable, and offline operation against a known local knowledge set. The stdio area includes a process-level CLI healthcheck test and an MCP client integration test that discovers and invokes the `healthcheck` tool.
 
 ## HTTP host
 
-Run the ASP.NET host and verify MCP HTTP transport behavior, health/readiness behavior if provided, configuration, and container startup. Avoid coupling tests to a particular public deployment URL.
+Run the actual ASP.NET host as a child process on a dynamically allocated loopback port. Verify `/api/health`, then use the MCP C# client over Streamable HTTP to initialize, discover the `healthcheck` tool, and invoke it at `/mcp`. Avoid coupling tests to a particular public deployment URL.
 
 ## Package fixtures
 

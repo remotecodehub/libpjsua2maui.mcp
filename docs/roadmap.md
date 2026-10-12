@@ -28,8 +28,8 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [x] Add stdio MCP protocol integration coverage for initialization, tool discovery, and invocation.
 - [x] Add HTTP host integration coverage for `/api/health`.
 - [x] Add HTTP MCP protocol integration coverage for initialization, tool discovery, and invocation.
-- [ ] Run the updated solution build and complete test suite successfully.
-- [ ] Confirm the latest GitHub Actions build/test run succeeds after these changes.
+- [x] Run the updated solution build and complete test suite successfully.
+- [x] Confirm the latest GitHub Actions build/test run succeeds after these changes.
 
 ## Phase 1 — Package ingestion
 
