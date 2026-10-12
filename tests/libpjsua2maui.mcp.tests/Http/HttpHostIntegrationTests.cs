@@ -15,11 +15,11 @@ public sealed class HttpHostIntegrationTests
     {
         await using var host = await HttpHostProcess.StartAsync();
 
-        using var response = await host.HttpClient.GetAsync("api/health");
+        using var response = await host.HttpClient.GetAsync("api/health", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         var root = document.RootElement;
 
         Assert.Equal("Healthy", root.GetProperty("status").GetString());
@@ -39,15 +39,18 @@ public sealed class HttpHostIntegrationTests
             TransportMode = HttpTransportMode.StreamableHttp
         });
 
-        await using var client = await McpClient.CreateAsync(transport);
+        await using var client = await McpClient.CreateAsync(
+            transport,
+            cancellationToken: TestContext.Current.CancellationToken);
 
-        var tools = await client.ListToolsAsync();
+        var tools = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
         Assert.Contains(tools, tool => tool.Name == "healthcheck");
 
         var result = await client.CallToolAsync(
             "healthcheck",
-            new Dictionary<string, object?>());
+            new Dictionary<string, object?>(),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var serializedResult = JsonSerializer.Serialize(result);
 

@@ -20,15 +20,18 @@ public sealed class StdioMcpProtocolIntegrationTests
             InheritEnvironmentVariables = true
         });
 
-        await using var client = await McpClient.CreateAsync(transport);
+        await using var client = await McpClient.CreateAsync(
+            transport,
+            cancellationToken: TestContext.Current.CancellationToken);
 
-        var tools = await client.ListToolsAsync();
+        var tools = await client.ListToolsAsync(TestContext.Current.CancellationToken);
 
         Assert.Contains(tools, tool => tool.Name == "healthcheck");
 
         var result = await client.CallToolAsync(
             "healthcheck",
-            new Dictionary<string, object?>());
+            new Dictionary<string, object?>(),
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var serializedResult = JsonSerializer.Serialize(result);
 
