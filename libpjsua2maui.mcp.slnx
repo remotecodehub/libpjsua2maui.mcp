@@ -4,4 +4,7 @@
     <Project Path="src/libpjsua2maui.mcp.stdio/libpjsua2maui.mcp.stdio.csproj" />
     <Project Path="src/libpjsua2maui.mcp/libpjsua2maui.mcp.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj" />
+  </Folder>
 </Solution>
