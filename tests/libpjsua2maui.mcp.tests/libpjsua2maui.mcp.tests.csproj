@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <TestingPlatformCommandLineArguments>--report-trx --report-trx-filename test-results.trx --coverlet --coverlet-output-format cobertura</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.MTP" Version="10.1.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" Version="2.5.1">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Moq" Version="4.21.0" />
+    <PackageReference Include="NSubstitute" Version="6.2.0" />
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\libpjsua2maui.mcp.stdio\libpjsua2maui.mcp.stdio.csproj" />
+    <ProjectReference Include="..\..\src\libpjsua2maui.mcp.http\libpjsua2maui.mcp.http.csproj" />
+    <ProjectReference Include="..\..\src\libpjsua2maui.mcp\libpjsua2maui.mcp.csproj" />
+  </ItemGroup>
+
+</Project>
