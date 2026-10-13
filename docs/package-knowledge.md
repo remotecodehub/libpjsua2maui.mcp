@@ -1,5 +1,11 @@
 # Package Knowledge Strategy
 
+## Supported package baseline
+
+The MCP requires `libpjsua2maui` version **2.17.0.4 or later** as its minimum supported package version. XML documentation comments are available in the published package starting with version `2.17.0.4`; versions below this baseline must not be treated as supported inputs for package knowledge indexing.
+
+The minimum-version requirement is part of the package ingestion contract and must be enforced when acquiring or indexing a package version.
+
 ## Primary artifact
 
 The published `libpjsua2maui.nupkg` is the consumer contract. Index it by exact version. The indexer should inspect assembly metadata and XML documentation first, then enrich it with package-contained generated artifacts where available.
