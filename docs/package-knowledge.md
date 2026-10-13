@@ -10,6 +10,43 @@ The minimum-version requirement is part of the package ingestion contract and mu
 
 The published `libpjsua2maui.nupkg` is the consumer contract. Index it by exact version. The indexer should inspect assembly metadata and XML documentation first, then enrich it with package-contained generated artifacts where available.
 
+## XML documentation validation by TFM
+
+During NuGet package acquisition and indexing, the ingestion process must validate that XML documentation is present for **each TFM represented under the package's `lib/` directory**.
+
+For every `lib/<TFM>/` directory containing the `libpjsua2maui` assembly, the package must contain the corresponding XML documentation file alongside the assembly:
+
+```text
+lib/
+├── net10.0-android/
+│   ├── libpjsua2maui.dll
+│   └── libpjsua2maui.xml
+├── net10.0-ios/
+│   ├── libpjsua2maui.dll
+│   └── libpjsua2maui.xml
+├── net10.0-maccatalyst/
+│   ├── libpjsua2maui.dll
+│   └── libpjsua2maui.xml
+└── net10.0-windows10.0.19041.0/
+    ├── libpjsua2maui.dll
+    └── libpjsua2maui.xml
+```
+
+The validation must therefore be performed **per TFM/platform**, rather than by checking only for the existence of a single XML file somewhere in the package.
+
+A package is considered invalid for indexing if an expected `lib/<TFM>/libpjsua2maui.xml` documentation file is missing for a TFM represented by the package assembly.
+
+The indexer must preserve the TFM association when ingesting the XML documentation. Documentation from one TFM must not be implicitly treated as documentation for another TFM.
+
+The validation helper should expose enough information to report:
+- the discovered TFMs;
+- the expected XML documentation path for each TFM;
+- which TFMs have valid XML documentation;
+- which TFMs are missing documentation;
+- the package version being validated.
+
+For the current supported package baseline (`2.17.0.4`), the published package is expected to provide one XML documentation file per supported MAUI TFM under `lib/`.
+
 ## SWIG/native enrichment
 
 `libpjsua2maui` is a C#/.NET MAUI binding over native pjproject. Generated SWIG C# wrappers and interface files are valuable because they explain ownership, callbacks, native handles, and naming transformations. pjproject headers/source may be used to establish native semantics, but only when the relationship is demonstrable.
