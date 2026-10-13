@@ -6,6 +6,8 @@ The MCP requires `libpjsua2maui` version **2.17.0.4 or later** as its minimum su
 
 The minimum-version requirement is part of the package ingestion contract and must be enforced when acquiring or indexing a package version.
 
+The Core knowledge model represents this package identity and minimum version explicitly. Its manifest, artifacts, symbol representations, documentation records, provenance, and partial relationships are immutable contracts; acquisition, parsing, indexing, and persistence remain later pipeline stages.
+
 ## Primary artifact
 
 The published `libpjsua2maui.nupkg` is the consumer contract. Index it by exact version. The indexer should inspect assembly metadata and XML documentation first, then enrich it with package-contained generated artifacts where available.
