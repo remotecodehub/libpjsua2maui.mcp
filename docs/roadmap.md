@@ -33,7 +33,7 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ## Phase 1 — Package ingestion
 
-- [ ] Define versioned package knowledge model.
+- [x] Define versioned package knowledge model.
 - [ ] Implement acquisition of `libpjsua2maui.nupkg`.
 - [ ] Extract assembly metadata and XML documentation.
 - [ ] Detect package assets, TFMs/RIDs and native artifacts.
