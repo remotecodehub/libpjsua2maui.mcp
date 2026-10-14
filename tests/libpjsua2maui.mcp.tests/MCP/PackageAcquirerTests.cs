@@ -101,7 +101,7 @@ public sealed class PackageAcquirerTests
         Assert.Contains(artifacts, artifact => artifact.RelativePath == "runtimes/android-arm64/native/libpjsua2maui.dylib" && artifact.Kind == ArtifactKind.NativeLibrary);
         Assert.Contains(artifacts, artifact => artifact.RelativePath == "runtimes/android-arm64/native/readme.txt" && artifact.Kind == ArtifactKind.Other);
         Assert.Contains(artifacts, artifact => artifact.RelativePath == "buildTransitive/libpjsua2maui.props" && artifact.Kind == ArtifactKind.PackageMetadata);
-        Assert.Contains(artifacts, artifact => artifact.RelativePath == "build/pinvoke/generated.cs" && artifact.Kind == ArtifactKind.PackageMetadata);
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "build/pinvoke/generated.cs" && artifact.Kind == ArtifactKind.SwigArtifact);
         Assert.Contains(artifacts, artifact => artifact.RelativePath == "tools/Example.SWIG.data" && artifact.Kind == ArtifactKind.SwigArtifact);
     }
 

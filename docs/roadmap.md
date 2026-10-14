@@ -42,7 +42,7 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ## Phase 2 — SWIG/pjproject mapping
 
-- [ ] Inspect generated SWIG artifacts available from the package/repository.
+- [x] Inspect generated SWIG artifacts available from the package/repository.
 - [ ] Model managed-to-SWIG relationships.
 - [ ] Model native pjproject mappings where evidence exists.
 - [ ] Model ownership, callbacks, disposal, handles, and lifecycle semantics.

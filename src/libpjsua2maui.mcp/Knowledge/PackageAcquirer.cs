@@ -204,10 +204,9 @@ public sealed class PackageAcquirer(HttpClient httpClient, PackageAcquisitionOpt
 
     private static bool IsSwigPath(string path)
     {
-        var fileName = Path.GetFileName(path);
-        return fileName.Contains("swig", StringComparison.OrdinalIgnoreCase) ||
-            fileName.EndsWith(".i", StringComparison.OrdinalIgnoreCase) ||
-            fileName.Contains("pinvoke", StringComparison.OrdinalIgnoreCase);
+        return path.Contains("swig", StringComparison.OrdinalIgnoreCase) ||
+            path.EndsWith(".i", StringComparison.OrdinalIgnoreCase) ||
+            path.Contains("pinvoke", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsPackageMetadataPath(string path)
