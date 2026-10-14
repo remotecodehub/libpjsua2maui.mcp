@@ -9,31 +9,14 @@ Tests are organized into three top-level folders matching the production boundar
 ```text
 tests/libpjsua2maui.mcp.tests/
 ├─ MCP/
-│  ├─ TestSupport/
-│  │  ├─ Fixtures/
-│  │  ├─ Mocks/
-│  │  ├─ Fakes/
-│  │  └─ Helpers/
-│  └─ ... MCP/Core tests
+│  └─ TestSupport/{Fixtures,Mocks,Fakes,Helpers}/
 ├─ Http/
-│  ├─ TestSupport/
-│  │  ├─ Fixtures/
-│  │  ├─ Mocks/
-│  │  ├─ Fakes/
-│  │  └─ Helpers/
-│  └─ ... HTTP host tests
+│  └─ TestSupport/{Fixtures,Mocks,Fakes,Helpers}/
 └─ Stdio/
-   ├─ TestSupport/
-   │  ├─ Fixtures/
-   │  ├─ Mocks/
-   │  ├─ Fakes/
-   │  └─ Helpers/
-   └─ ... stdio host tests
+   └─ TestSupport/{Fixtures,Mocks,Fakes,Helpers}/
 ```
 
-`MCP`, `Http`, and `Stdio` are the only top-level test areas. Test-support code belongs to the `TestSupport` folder of the area it serves and must not become an implicit shared test utility. If a helper is genuinely shared by two or more areas, it should be moved to a deliberately documented common test-support location rather than copied.
-
-The current repository establishes the three top-level test areas; their `TestSupport` subdirectories are the designated location for fixtures, mocks, fakes, and helpers as those tests are implemented.
+`MCP`, `Http`, and `Stdio` are the only top-level test areas. Test-support code belongs to the `TestSupport` folder of the area it serves and must not become an implicit shared test utility. If a helper is genuinely shared by two or more areas, move it to a deliberately documented common test-support location rather than copying it.
 
 ## Core
 
@@ -61,24 +44,37 @@ Use mocks, fakes, and stubs only when they isolate a meaningful boundary. Prefer
 
 ## Mandatory QualityGate
 
-Run all commands from the repository root. First restore the repository-local .NET tools (including ReportGenerator):
+Run commands from the repository root. First restore repository-local .NET tools, including ReportGenerator:
 
 ```powershell
 dotnet tool restore
 ```
 
-Then run the test project's custom target:
+The original project-level gate remains available:
 
 ```powershell
 dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
 ```
 
-The `QualityGate` target executes the tests and creates coverage reports under `tests/libpjsua2maui.mcp.tests/TestResults/QualityGate/Report`. The required minimum is 90% for line, branch, and method coverage. The target emits one warning for each coverage dimension below 90% and fails if any dimension is below the threshold. The generated `Summary.txt` and `Summary.md` are the evidence for the reported percentages.
+If that MSBuild target cannot be invoked in the local environment, build and run the generated Microsoft.Testing.Platform executable directly to confirm that its Coverlet arguments create a Cobertura XML report. Resolve the actual executable path from the build output; do not assume the filename or output directory:
 
-A successful ordinary build or `dotnet test` is not a substitute for this target. Do not reduce the threshold or exclude relevant production code to make the gate pass. Report the exact command result and actual percentages for all three dimensions.
+```powershell
+dotnet test ./tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.exe
+```
 
-If the command cannot execute because of an environment/tooling restriction, stop and notify the user with the exact command and relevant error. Wait for the user to adjust the target and signal that the agent may resume. If an additional target is a more practical solution, it may be added to parse method coverage from the existing Coverlet/ReportGenerator text report, but the existing `QualityGate` target must remain intact.
+Then run the executable-driven gate, which runs the built test executable, generates `Summary.txt` and `Summary.md`, prints all three coverage percentages, and enforces the configured threshold:
+
+```powershell
+dotnet tool restore
+dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGateExecutable
+```
+
+The `QualityGateExecutable` target is an alternative validation path; it does not replace or weaken `QualityGate`. Both use `QualityGateThreshold` (90 by default) and require at least that percentage for line, branch, and method coverage. Reports are stored under `tests/libpjsua2maui.mcp.tests/TestResults/QualityGate/Report`. A missing/invalid report or test failure must fail the target. If the direct `dotnet test <executable>` invocation creates coverage output in a different location than expected, inspect the actual files and correct the target/output configuration rather than claiming success.
+
+Do not reduce the threshold or exclude relevant production code to make the gate pass. Report the exact commands, exit codes, actual percentages, and report paths. A plain successful build or test run is not a substitute for coverage validation.
+
+If neither gate can execute because of an environment/tooling restriction, stop and notify the user with the exact command and full relevant error. Wait for the user to adjust the target and explicitly authorize resumption.
 
 ## Validation gates
 
-A roadmap phase is complete only when the relevant tests pass, the solution builds, the mandatory `QualityGate` passes, and documentation accurately describes the resulting behavior.
+A roadmap phase is complete only when the relevant tests pass, the solution builds, the mandatory quality gate passes, and documentation accurately describes the resulting behavior.
