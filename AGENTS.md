@@ -50,15 +50,17 @@ The MCP is a knowledge/query service, not a runtime replacement for pjproject. I
 ## Testing and validation
 Every implementation stage must build the solution and run relevant tests. Add unit tests for core behavior before relying on host-level tests. Validate both hosts when transport code changes. Keep test fixtures and doubles isolated by test area. Do not claim support for a platform, package version, MCP feature, or native symbol without evidence.
 
-**Mandatory test quality gate:** From the repository root, run `dotnet tool restore` before invoking repository-local tools. Then run exactly:
+**Mandatory test quality gate:** From the repository root, run `dotnet tool restore` before invoking repository-local tools. Then run:
 
 ```powershell
 dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
 ```
 
-The custom `QualityGate` target runs tests, generates reports, and enforces at least 90% line, branch, and method coverage. A warning is emitted for each dimension below threshold and the target fails if any dimension is below 90%. A successful build or plain test run is not a substitute. Report the actual coverage percentages from the generated report and claim success only if the command exits successfully and all three dimensions meet the threshold.
+If the target is blocked by an environment/MSBuild invocation problem, capture the full error and use the supplemental executable path without removing or weakening `QualityGate`:
+1. Resolve the test executable path from build output and run `dotnet test <path-to-test-executable>` to verify test execution and Cobertura XML generation.
+2. Run `dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGateExecutable` to produce summary reports and enforce the same configured line, branch, and method thresholds.
 
-If the command is blocked by environment/tooling limitations, stop and notify the user with the exact command and error; do not silently bypass the gate, lower its threshold, or remove the existing target. Wait for the user to adjust the target and authorize resumption, unless an additional compatible target that preserves the existing one is clearly the appropriate fix.
+Inspect the actual coverage reports and command exit codes. A direct executable test run alone does not prove the quality gate passed. Report the real percentages and claim success only if the executable completed, all required metrics were parsed, and every dimension meets the threshold (90% by default). If both targets are blocked, stop and notify the user with exact commands and full relevant diagnostics; wait for the user to adjust the target and authorize resumption.
 
 ## Git discipline
 Keep changes focused. Do not rewrite unrelated project files. Update documentation and roadmap status when architecture or capabilities change. Use clear conventional commit messages. Changes to `main` are allowed for repository bootstrap/documentation work when explicitly requested; implementation work should normally be reviewed through the repository's established workflow.
