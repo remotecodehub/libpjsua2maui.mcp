@@ -49,6 +49,7 @@ jobs:
       - name: Test
         id: test
         shell: pwsh 
+        working-directory: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/
         continue-on-error: true
         run: |
           New-Item -ItemType Directory -Force -Path @(Join-Path '${{ env.TEST_RESULTS_DIR }}' 'QualityGate') | Out-Null
