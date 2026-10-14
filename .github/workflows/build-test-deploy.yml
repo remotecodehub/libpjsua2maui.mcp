@@ -31,21 +31,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
       - name: Restore
         run: dotnet restore "${{ env.SOLUTION }}"
-
       - name: Restore Tools
         run: dotnet tool restore
-      
       - name: Build
         run: dotnet build "${{ env.SOLUTION }}" --configuration Release --no-restore
-        
       - name: Test
         id: test
         shell: pwsh
@@ -57,18 +52,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $resultsDir = $env:TEST_RESULTS_DIR
           New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
-
-          # Remove stale outputs so this run cannot accidentally consume artifacts from a previous run.
           Get-ChildItem -Path $resultsDir -Force -ErrorAction SilentlyContinue |
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path (Join-Path $resultsDir 'QualityGate') | Out-Null
-
           $outputFile = Join-Path $resultsDir 'test-output.txt'
-
-          # The test project is configured as a Microsoft.Testing.Platform test project.
-          # Run the solution through dotnet test so the test project is resolved by
-          # the normal .NET test target and its TestingPlatformCommandLineArguments
-          # supply the configured TRX and Coverlet options.
           Write-Host "Executing tests through solution: $env:SOLUTION"
           Write-Host "Test results directory: $resultsDir"
           & dotnet test $env:SOLUTION --configuration Release --no-build *> $outputFile
@@ -76,26 +63,11 @@ jobs:
           Get-Content $outputFile
           "dotnet test exit code: $exitCode" | Add-Content -Path $outputFile
           "TEST_EXIT_CODE=$exitCode" | Set-Content -Path (Join-Path $resultsDir 'test-exit-code.txt') -Encoding utf8
-
           $trxFiles = @(Get-ChildItem -Path $resultsDir -Filter '*.trx' -File -Recurse -ErrorAction SilentlyContinue)
-          if ($trxFiles.Count -eq 0) {
-            Write-Warning "No TRX file was generated under $resultsDir."
-          } else {
-            $trxFiles | ForEach-Object { Write-Host "TRX: $($_.FullName)" }
-          }
-
+          if ($trxFiles.Count -eq 0) { Write-Warning "No TRX file was generated under $resultsDir." } else { $trxFiles | ForEach-Object { Write-Host "TRX: $($_.FullName)" } }
           $coverageFiles = @(Get-ChildItem -Path $resultsDir -Filter 'coverage.cobertura*.xml' -File -Recurse -ErrorAction SilentlyContinue)
-          if ($coverageFiles.Count -eq 0) {
-            Write-Warning "No Cobertura coverage XML was found under $resultsDir."
-          } else {
-            $coverageFiles | ForEach-Object { Write-Host "Coverage XML: $($_.FullName)" }
-          }
-
-          if ($exitCode -ne 0) {
-            Write-Error "Tests failed with exit code $exitCode. Output is available at $outputFile."
-            exit $exitCode
-          }
-
+          if ($coverageFiles.Count -eq 0) { Write-Warning "No Cobertura coverage XML was found under $resultsDir." } else { $coverageFiles | ForEach-Object { Write-Host "Coverage XML: $($_.FullName)" } }
+          if ($exitCode -ne 0) { Write-Error "Tests failed with exit code $exitCode. Output is available at $outputFile."; exit $exitCode }
       - name: Debug generated artifacts
         if: always()
         shell: pwsh
@@ -103,13 +75,8 @@ jobs:
           TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
         run: |
           if (Test-Path $env:TEST_RESULTS_DIR) {
-            Get-ChildItem -Path $env:TEST_RESULTS_DIR -Recurse -File |
-              Select-Object FullName, Length |
-              Format-Table -AutoSize
-          } else {
-            Write-Warning "Test results directory does not exist: $env:TEST_RESULTS_DIR"
-          }
-
+            Get-ChildItem -Path $env:TEST_RESULTS_DIR -Recurse -File | Select-Object FullName, Length | Format-Table -AutoSize
+          } else { Write-Warning "Test results directory does not exist: $env:TEST_RESULTS_DIR" }
       - name: Publish Test Summary
         uses: dorny/test-reporter@v3
         if: always()
@@ -118,7 +85,6 @@ jobs:
           path: '${{ env.TEST_RESULTS_DIR }}/**/*.trx'
           reporter: 'dotnet-trx'
           fail-on-error: 'false'
-
       - name: Generate report
         if: always()
         shell: pwsh
@@ -129,30 +95,20 @@ jobs:
           $resultsDir = $env:TEST_RESULTS_DIR
           $reportDir = Join-Path $resultsDir 'Report'
           $coverageFiles = @(Get-ChildItem -Path $resultsDir -Filter 'coverage.cobertura*.xml' -File -Recurse -ErrorAction SilentlyContinue)
-
           if ($coverageFiles.Count -eq 0) {
-            "## Coverage report`n`nReportGenerator was not run because no Cobertura coverage XML was produced by the test run." |
-              Add-Content -Path $env:GITHUB_STEP_SUMMARY
+            "## Coverage report`n`nReportGenerator was not run because no Cobertura coverage XML was produced by the test run." | Add-Content -Path $env:GITHUB_STEP_SUMMARY
             Write-Error "No coverage.cobertura*.xml files found under $resultsDir."
             exit 1
           }
-
           $reports = ($coverageFiles | ForEach-Object { $_.FullName }) -join ';'
           New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
           dotnet tool run reportgenerator "-reports:$reports" "-targetdir:$reportDir" '-reporttypes:MarkdownSummary;TextSummary' '-classfilters:+libpjsua2maui.mcp*;-Program'
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "ReportGenerator failed with exit code $LASTEXITCODE."
-            exit $LASTEXITCODE
-          }
-
+          if ($LASTEXITCODE -ne 0) { Write-Error "ReportGenerator failed with exit code $LASTEXITCODE."; exit $LASTEXITCODE }
           foreach ($name in @('Summary.md', 'Summary.txt')) {
             $reportPath = Join-Path $reportDir $name
-            if (-not (Test-Path $reportPath)) {
-              throw "Expected ReportGenerator output was not produced: $reportPath"
-            }
+            if (-not (Test-Path $reportPath)) { throw "Expected ReportGenerator output was not produced: $reportPath" }
             Write-Host "Generated report: $reportPath"
           }
-
       - name: Enforce quality gate (Line, Branch and Method coverage)
         if: always()
         shell: pwsh
@@ -165,10 +121,8 @@ jobs:
           $threshold = [double]$env:QUALITY_GRADE_THRESHOLD
           $failed = $false
           $failures = @()
-
           if (-not (Test-Path $summaryFile)) {
-            $failed = $true
-            $failures += "ReportGenerator Summary.txt was not produced."
+            $failed = $true; $failures += "ReportGenerator Summary.txt was not produced."
           } else {
             $content = Get-Content -Path $summaryFile -Raw
             $lineMatch = [regex]::Match($content, '(?im)^\s*Line coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
@@ -176,30 +130,19 @@ jobs:
             $branchMatch = [regex]::Match($content, '(?im)^\s*Branch coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
             $coveredBranchesMatch = [regex]::Match($content, '(?im)^\s*Covered branches:\s*([0-9]+)')
             $totalBranchesMatch = [regex]::Match($content, '(?im)^\s*Total branches:\s*([0-9]+)')
-
             if (-not $lineMatch.Success -or -not $methodMatch.Success) {
-              $failed = $true
-              $failures += "Unable to extract line or method coverage from Summary.txt."
+              $failed = $true; $failures += "Unable to extract line or method coverage from Summary.txt."
             } else {
               $lineRate = [double]::Parse($lineMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
               $methodRate = [double]::Parse($methodMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
-
-              if ($branchMatch.Success) {
-                $branchRate = [double]::Parse($branchMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
-              } elseif ($coveredBranchesMatch.Success -and $totalBranchesMatch.Success) {
-                $coveredBranches = [double]$coveredBranchesMatch.Groups[1].Value
-                $totalBranches = [double]$totalBranchesMatch.Groups[1].Value
+              if ($branchMatch.Success) { $branchRate = [double]::Parse($branchMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture) }
+              elseif ($coveredBranchesMatch.Success -and $totalBranchesMatch.Success) {
+                $coveredBranches = [double]$coveredBranchesMatch.Groups[1].Value; $totalBranches = [double]$totalBranchesMatch.Groups[1].Value
                 $branchRate = if ($totalBranches -eq 0) { 100.0 } else { [math]::Round($coveredBranches * 100 / $totalBranches, 1) }
-              } else {
-                $failed = $true
-                $failures += "Unable to extract branch coverage from Summary.txt."
-                $branchRate = 0.0
-              }
-
+              } else { $failed = $true; $failures += "Unable to extract branch coverage from Summary.txt."; $branchRate = 0.0 }
               $lineStatus = if ($lineRate -ge $threshold) { 'PASS' } else { 'FAIL' }
               $branchStatus = if ($branchRate -ge $threshold) { 'PASS' } else { 'FAIL' }
               $methodStatus = if ($methodRate -ge $threshold) { 'PASS' } else { 'FAIL' }
-
               @"
           ## Coverage quality gate
           | Metric | Result | Minimum | Status |
@@ -208,38 +151,27 @@ jobs:
           | Branch coverage | $([math]::Round($branchRate, 2))% | $threshold% | $branchStatus |
           | Method coverage | $([math]::Round($methodRate, 2))% | $threshold% | $methodStatus |
           "@ | Add-Content -Path $env:GITHUB_STEP_SUMMARY
-
               "$([math]::Round($lineRate, 2))" | Set-Content (Join-Path $env:TEST_RESULTS_DIR 'line-rate.txt')
               "$([math]::Round($branchRate, 2))" | Set-Content (Join-Path $env:TEST_RESULTS_DIR 'branch-rate.txt')
               "$([math]::Round($methodRate, 2))" | Set-Content (Join-Path $env:TEST_RESULTS_DIR 'method-rate.txt')
-
               if ($lineRate -lt $threshold) { $failed = $true; $failures += "Line coverage $lineRate% is below $threshold%." }
               if ($branchRate -lt $threshold) { $failed = $true; $failures += "Branch coverage $branchRate% is below $threshold%." }
               if ($methodRate -lt $threshold) { $failed = $true; $failures += "Method coverage $methodRate% is below $threshold%." }
             }
           }
-
           $testExitCodeFile = Join-Path $env:TEST_RESULTS_DIR 'test-exit-code.txt'
-          if (-not (Test-Path $testExitCodeFile)) {
-            $failed = $true
-            $failures += "Test execution exit-code file was not produced."
-          } else {
+          if (-not (Test-Path $testExitCodeFile)) { $failed = $true; $failures += "Test execution exit-code file was not produced." }
+          else {
             $testExitText = (Get-Content -Path $testExitCodeFile -Raw).Trim() -replace '^TEST_EXIT_CODE=', ''
-            if ($testExitText -notmatch '^-?\d+$' -or [int]$testExitText -ne 0) {
-              $failed = $true
-              $failures += "Test execution failed or returned an invalid exit code: '$testExitText'."
-            }
+            if ($testExitText -notmatch '^-?\d+$' -or [int]$testExitText -ne 0) { $failed = $true; $failures += "Test execution failed or returned an invalid exit code: '$testExitText'." }
           }
-
           if ($failed) {
             $summaryText = $failures -join ' '
             Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "**Quality Gate: FAILED** — $summaryText"
             Write-Error "Quality Gate failed: $summaryText"
             exit 1
           }
-
           Write-Host "QUALITY GATE: PASSED (minimum $threshold% for line, branch and method coverage)."
-
       - name: Append test and coverage reports to GitHub Summary
         if: always()
         shell: pwsh
@@ -252,18 +184,11 @@ jobs:
           $textReport = Join-Path $resultsDir 'Report/Summary.txt'
           $trxFiles = @(Get-ChildItem -Path $resultsDir -Filter '*.trx' -File -Recurse -ErrorAction SilentlyContinue)
           $coverageFiles = @(Get-ChildItem -Path $resultsDir -Filter 'coverage.cobertura*.xml' -File -Recurse -ErrorAction SilentlyContinue)
-
           Add-Content -Path $summaryFile -Value "`n## Test and coverage artifacts`n"
           Add-Content -Path $summaryFile -Value "- TRX files found: $($trxFiles.Count)"
           Add-Content -Path $summaryFile -Value "- Cobertura files found: $($coverageFiles.Count)"
-
-          if (Test-Path $markdownReport) {
-            Add-Content -Path $summaryFile -Value "`n## Coverage report`n"
-            Get-Content -Path $markdownReport -Raw | Add-Content -Path $summaryFile
-          } else {
-            Add-Content -Path $summaryFile -Value "`nCoverage Markdown report was not generated: $markdownReport"
-          }
-
+          if (Test-Path $markdownReport) { Add-Content -Path $summaryFile -Value "`n## Coverage report`n"; Get-Content -Path $markdownReport -Raw | Add-Content -Path $summaryFile }
+          else { Add-Content -Path $summaryFile -Value "`nCoverage Markdown report was not generated: $markdownReport" }
           if (Test-Path $textReport) {
             Add-Content -Path $summaryFile -Value "`n<details><summary>Coverage report (text)</summary>`n"
             Add-Content -Path $summaryFile -Value "`n```text"
@@ -271,7 +196,6 @@ jobs:
             Add-Content -Path $summaryFile -Value '```'
             Add-Content -Path $summaryFile -Value '</details>'
           }
-
       - name: Upload test and coverage reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -285,7 +209,6 @@ jobs:
             ${{ env.TEST_RESULTS_DIR }}/test-output.txt
             ${{ env.TEST_RESULTS_DIR }}/test-exit-code.txt
           if-no-files-found: warn
-
   docker:
     name: Build HTTP Docker image
     runs-on: ubuntu-latest
@@ -293,10 +216,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
       - name: Login to GHCR
         if: startsWith(github.ref, 'refs/tags/')
         uses: docker/login-action@v4
@@ -304,7 +225,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -314,18 +234,16 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=sha,prefix=sha-,format=short
-
       - name: Build Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: src/libpjsua2mcp.http/Dockerfile
+          file: src/libpjsua2maui.mcp.http/Dockerfile
           push: ${{ startsWith(github.ref, 'refs/tags/') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
   nuget:
     name: Continuous Delivery
     runs-on: ubuntu-latest
@@ -334,24 +252,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-
       - name: Restore
         run: dotnet restore "${{ env.STDIO_PROJECT }}"
-
       - name: Calculate package version
         id: version
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-
       - name: Pack dotnet tool
         run: dotnet pack "${{ env.STDIO_PROJECT }}" --configuration Release --no-restore --output ./artifacts -p:PackageVersion=${{ steps.version.outputs.version }}
-
       - name: Publish to NuGet
         run: dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
