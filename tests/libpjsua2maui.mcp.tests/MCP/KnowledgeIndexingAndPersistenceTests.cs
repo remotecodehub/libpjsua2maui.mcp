@@ -230,6 +230,12 @@ public sealed class KnowledgeIndexingAndPersistenceTests
     [InlineData("artifact-kind")]
     [InlineData("artifact-path")]
     [InlineData("artifact-rooted")]
+    [InlineData("artifact-drive-backslash")]
+    [InlineData("artifact-absolute")]
+    [InlineData("artifact-unc")]
+    [InlineData("artifact-parent-segment")]
+    [InlineData("artifact-current-segment")]
+    [InlineData("artifact-parent-segment-nested")]
     [InlineData("artifact-backslash")]
     [InlineData("artifact-empty-segment")]
     [InlineData("symbol-kind")]
@@ -261,6 +267,12 @@ public sealed class KnowledgeIndexingAndPersistenceTests
             case "artifact-kind": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib/a.dll" }.ToModel(package, version, identity)); break;
             case "artifact-path": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
             case "artifact-rooted": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "C:/a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-drive-backslash": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = @"C:\a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-absolute": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "/absolute/a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-unc": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = @"\\server\share\a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-parent-segment": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "../a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-current-segment": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "./a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-parent-segment-nested": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib/../a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
             case "artifact-backslash": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib\\a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
             case "artifact-empty-segment": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib//a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
             case "symbol-kind": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.SymbolDto { QualifiedName = "x" }.ToModel(package, version, artifacts, identity)); break;

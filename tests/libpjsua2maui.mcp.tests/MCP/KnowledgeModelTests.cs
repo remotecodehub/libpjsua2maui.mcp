@@ -137,10 +137,27 @@ public sealed class KnowledgeModelTests
     }
 
     [Theory]
+    [InlineData("lib/asset.dll")]
+    [InlineData("ref/net10.0/foo.dll")]
+    [InlineData("runtimes/linux-x64/native/libfoo.so")]
+    [InlineData("runtimes/win-x64/native/foo.dll")]
+    public void Artifact_AcceptsCanonicalPackagePaths(string path)
+    {
+        var artifact = new PackageArtifact(Package, PackageVersion.Parse("2.17.0.4"), path, ArtifactKind.Other);
+
+        Assert.Equal(path, artifact.RelativePath);
+    }
+
+    [Theory]
     [InlineData("../outside.dll")]
+    [InlineData("./asset.dll")]
+    [InlineData("lib/../asset.dll")]
     [InlineData("lib//asset.dll")]
     [InlineData("lib/./asset.dll")]
     [InlineData("C:/asset.dll")]
+    [InlineData(@"C:\asset.dll")]
+    [InlineData("/absolute/path.dll")]
+    [InlineData(@"\\server\share\asset.dll")]
     public void Artifact_RejectsUnsafeOrNonCanonicalPaths(string path)
     {
         Assert.Throws<ArgumentException>(() => new PackageArtifact(Package, PackageVersion.Parse("2.17.0.4"), path, ArtifactKind.Other));

@@ -46,8 +46,7 @@ public sealed record PackageArtifact
     private static string RequirePath(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        var segments = value.Replace('\\', '/').Split('/');
-        if (Path.IsPathRooted(value) || value.Contains('\\') || segments.Any(segment => segment is "" or "." or ".."))
+        if (!PackagePathValidator.IsValid(value))
         {
             throw new ArgumentException("Artifact paths must be relative package paths using '/'.", nameof(value));
         }

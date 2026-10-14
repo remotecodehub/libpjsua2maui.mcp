@@ -237,9 +237,7 @@ public sealed class PackageAcquirer(HttpClient httpClient, PackageAcquisitionOpt
     private static string NormalizeEntryPath(string path)
     {
         var normalized = path.Replace('\\', '/');
-        var segments = normalized.Split('/');
-        if (string.IsNullOrWhiteSpace(normalized) || normalized.StartsWith('/') || Path.IsPathRooted(normalized) ||
-            segments.Any(segment => segment is "" or "." or ".."))
+        if (!PackagePathValidator.IsValid(path))
         {
             throw new InvalidDataException($"The package contains an invalid relative entry path: '{path}'.");
         }

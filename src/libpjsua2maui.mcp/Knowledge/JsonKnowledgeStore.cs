@@ -147,10 +147,10 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public PackageArtifact ToModel(PackageIdentity p, PackageVersion v, KnowledgeSetIdentity identity)
         {
             var artifactPath = Path;
-            if (!TryParseEnum(Kind, out ArtifactKind kind) || artifactPath is null || System.IO.Path.IsPathRooted(artifactPath) || artifactPath.Contains('\\') || artifactPath.Split('/').Any(segment => segment is "" or "." or "..")) throw new InvalidDataException("Invalid package artifact.");
+            if (!TryParseEnum(Kind, out ArtifactKind kind) || !PackagePathValidator.IsValid(artifactPath)) throw new InvalidDataException("Invalid package artifact.");
             var provenance = Provenance?.ToModel(identity);
             if (provenance?.ArtifactPath is not null && !provenance.ArtifactPath.Equals(artifactPath, StringComparison.Ordinal)) throw new InvalidDataException("Artifact provenance does not reference the artifact.");
-            return new PackageArtifact(p, v, artifactPath, kind, TargetFramework, RuntimeIdentifier, provenance);
+            return new PackageArtifact(p, v, artifactPath!, kind, TargetFramework, RuntimeIdentifier, provenance);
         }
     }
 
