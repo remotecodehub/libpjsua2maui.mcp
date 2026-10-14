@@ -58,11 +58,11 @@ jobs:
           $resultsDir = $env:TEST_RESULTS_DIR
           $testAssembly = Join-Path $env:GITHUB_WORKSPACE 'tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.dll'
           New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
-          New-Item -ItemType Directory -Force -Path (Join-Path $resultsDir 'QualityGate') | Out-Null
 
           # Remove stale outputs so this run cannot accidentally consume artifacts from a previous run.
           Get-ChildItem -Path $resultsDir -Force -ErrorAction SilentlyContinue |
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path (Join-Path $resultsDir 'QualityGate') | Out-Null
 
           if (-not (Test-Path $testAssembly)) {
             throw "Test assembly was not built: $testAssembly"
@@ -81,7 +81,7 @@ jobs:
 
           Write-Host "Executing Microsoft.Testing.Platform test assembly: $testAssembly"
           Write-Host "TRX output directory: $resultsDir"
-          & dotnet @testArguments *> $outputFile
+          & dotnet test @testArguments *> $outputFile
           $exitCode = $LASTEXITCODE
           Get-Content $outputFile
           "dotnet test exit code: $exitCode" | Add-Content -Path $outputFile
@@ -165,98 +165,88 @@ jobs:
         if: always()
         shell: pwsh
         env:
-          TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
-          QUALITY_GRADE_THRESHOLD: 90
-        env:
+          TEST_RESULTS_DIR: \${{ env.TEST_RESULTS_DIR }}
           QUALITY_GRADE_THRESHOLD: 90
         run: |
-          $summaryFile = Join-Path $env:TEST_RESULTS_DIR "Report/Summary.txt"
-          if (-not (Test-Path $summaryFile)) {
-              "## Coverage gate`n`nThe ReportGenerator Summary.txt report was not produced." | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-              Write-Error "Summary coverage data was not produced."
-              exit 1
-          }
-          
-          $content = Get-Content $summaryFile -Raw
+          $ErrorActionPreference = 'Stop'
+          $summaryFile = Join-Path $env:TEST_RESULTS_DIR 'Report/Summary.txt'
           $threshold = [double]$env:QUALITY_GRADE_THRESHOLD
-
-          # Extração dos dados do cabeçalho do Summary.txt
-          $lineMatch = [regex]::Match($content, '(?im)^\s*Line coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
-          $methodMatch = [regex]::Match($content, '(?im)^\s*Method coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
-          $branchMatch = [regex]::Match($content, '(?im)^\s*Branch coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
-          $coveredBranchesMatch = [regex]::Match($content, '(?im)^\s*Covered branches:\s*([0-9]+)')
-          $totalBranchesMatch = [regex]::Match($content, '(?im)^\s*Total branches:\s*([0-9]+)')
-
-          if (-not $lineMatch.Success -or -not$methodMatch.Success) {
-              Write-Error "Quality Gate aborted: unable to extract line or method coverage data from Summary.txt."
-              exit 1
-          }
-
-          $lineRate = [double]$lineMatch.Groups[1].Value
-          $methodRate = [double]$methodMatch.Groups[1].Value
-
-          # Cálculo/Extração de Branch Coverage robusto
-          $branchRate = 0
-          if ($branchMatch.Success) {
-              $branchRate = [double]$branchMatch.Groups[1].Value
-          } elseif ($coveredBranchesMatch.Success -and$totalBranchesMatch.Success) {
-              $cb = [double]$coveredBranchesMatch.Groups[1].Value
-              $tb = [double]$totalBranchesMatch.Groups[1].Value
-              if ($tb -eq 0) {
-                  $branchRate = 100.0             } else {$branchRate = [math]::Round(($cb * 100 / $tb), 1)
-              }
-          } else {
-              Write-Error "Quality Gate aborted: unable to extract branch coverage data from Summary.txt."
-              exit 1
-          }
-
-          # Status visuais para o resumo
-          $lineStatus = if ($lineRate -ge$threshold) { '✅' } else { '❌' }
-          $branchStatus = if ($branchRate -ge $threshold) { '✅' } else { '❌' }
-          $methodStatus = if ($methodRate -ge$threshold) { '✅' } else { '❌' }
-
-          # Escrevendo no Summary do GitHub Actions
-          @"
-          ## Coverage gate
-          | Metric | Result | Minimum | Status |
-          | --- | ---: | ---: | ---: |
-          | Line coverage | $([math]::Round($lineRate, 2))% | $threshold\% | $lineStatus |
-          | Branch coverage | $([math]::Round($branchRate, 2))% | $threshold\% | $branchStatus |
-          | Method coverage | $([math]::Round($methodRate, 2))% | $threshold\% | $methodStatus |
-          "@ | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-
-          # Salvando os arquivos de texto auxiliares
-          $qualityGateDir = ${{ env.TEST_RESULTS_DIR }} 
-          if (-not (Test-Path $qualityGateDir)) { New-Item -ItemType Directory -Path$qualityGateDir | Out-Null }
-          
-          "$([math]::Round($lineRate, 2))" | Out-File (Join-Path $qualityGateDir "line-rate.txt") -Encoding utf8
-          "$([math]::Round($branchRate, 2))" | Out-File (Join-Path $qualityGateDir "branch-rate.txt") -Encoding utf8
-          "$([math]::Round($methodRate, 2))" | Out-File (Join-Path $qualityGateDir "method-rate.txt") -Encoding utf8
-
-          # Validação das regras de Quality Gate
           $failed = $false
           $failures = @()
 
-          if ($lineRate -lt $threshold) {
-              $failed = $true
-              $failures += "Line coverage ($([math]::Round($lineRate, 2))\%) is below the required $threshold%."
-          }
-          if ($branchRate -lt $threshold) {
+          if (-not (Test-Path $summaryFile)) {
             $failed = $true
-            $failures += "Branch coverage ($([math]::Round($branchRate, 2))\%) is below the required $threshold%."
-          }
-          if ($methodRate -lt $threshold) {
+            $failures += "ReportGenerator Summary.txt was not produced."
+          } else {
+            $content = Get-Content -Path $summaryFile -Raw
+            $lineMatch = [regex]::Match($content, '(?im)^\s*Line coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
+            $methodMatch = [regex]::Match($content, '(?im)^\s*Method coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
+            $branchMatch = [regex]::Match($content, '(?im)^\s*Branch coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
+            $coveredBranchesMatch = [regex]::Match($content, '(?im)^\s*Covered branches:\s*([0-9]+)')
+            $totalBranchesMatch = [regex]::Match($content, '(?im)^\s*Total branches:\s*([0-9]+)')
+
+            if (-not $lineMatch.Success -or -not $methodMatch.Success) {
               $failed = $true
-              $failures += "Method coverage ($([math]::Round($methodRate, 2))\%) is below the required $threshold%."
+              $failures += "Unable to extract line or method coverage from Summary.txt."
+            } else {
+              $lineRate = [double]::Parse($lineMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
+              $methodRate = [double]::Parse($methodMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
+
+              if ($branchMatch.Success) {
+                $branchRate = [double]::Parse($branchMatch.Groups[1].Value, [Globalization.CultureInfo]::InvariantCulture)
+              } elseif ($coveredBranchesMatch.Success -and $totalBranchesMatch.Success) {
+                $coveredBranches = [double]$coveredBranchesMatch.Groups[1].Value
+                $totalBranches = [double]$totalBranchesMatch.Groups[1].Value
+                $branchRate = if ($totalBranches -eq 0) { 100.0 } else { [math]::Round($coveredBranches * 100 / $totalBranches, 1) }
+              } else {
+                $failed = $true
+                $failures += "Unable to extract branch coverage from Summary.txt."
+                $branchRate = 0.0
+              }
+
+              $lineStatus = if ($lineRate -ge $threshold) { 'PASS' } else { 'FAIL' }
+              $branchStatus = if ($branchRate -ge $threshold) { 'PASS' } else { 'FAIL' }
+              $methodStatus = if ($methodRate -ge $threshold) { 'PASS' } else { 'FAIL' }
+
+              @"
+          ## Coverage quality gate
+          | Metric | Result | Minimum | Status |
+          | --- | ---: | ---: | --- |
+          | Line coverage | $([math]::Round($lineRate, 2))% | $threshold% | $lineStatus |
+          | Branch coverage | $([math]::Round($branchRate, 2))% | $threshold% | $branchStatus |
+          | Method coverage | $([math]::Round($methodRate, 2))% | $threshold% | $methodStatus |
+          "@ | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+              "$([math]::Round($lineRate, 2))" | Set-Content (Join-Path $env:TEST_RESULTS_DIR 'line-rate.txt')
+              "$([math]::Round($branchRate, 2))" | Set-Content (Join-Path $env:TEST_RESULTS_DIR 'branch-rate.txt')
+              "$([math]::Round($methodRate, 2))" | Set-Content (Join-Path $env:TEST_RESULTS_DIR 'method-rate.txt')
+
+              if ($lineRate -lt $threshold) { $failed = $true; $failures += "Line coverage $lineRate% is below $threshold%." }
+              if ($branchRate -lt $threshold) { $failed = $true; $failures += "Branch coverage $branchRate% is below $threshold%." }
+              if ($methodRate -lt $threshold) { $failed = $true; $failures += "Method coverage $methodRate% is below $threshold%." }
+            }
           }
 
           $testExitCodeFile = Join-Path $env:TEST_RESULTS_DIR 'test-exit-code.txt'
           if (-not (Test-Path $testExitCodeFile)) {
-              $failed = $true
-              $failures += "Test execution exit-code file was not produced."
+            $failed = $true
+            $failures += "Test execution exit-code file was not produced."
           } else {
-              $testExitText = (Get-Content -Path $testExitCodeFile -Raw).Trim() -replace '^TEST_EXIT_CODE=', ''
-              if ($testExitText -notmatch '^-?\d+
+            $testExitText = (Get-Content -Path $testExitCodeFile -Raw).Trim() -replace '^TEST_EXIT_CODE=', ''
+            if ($testExitText -notmatch '^-?\d+$' -or [int]$testExitText -ne 0) {
+              $failed = $true
+              $failures += "Test execution failed or returned an invalid exit code: '$testExitText'."
+            }
+          }
+
+          if ($failed) {
+            $summaryText = $failures -join ' '
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "\`n**Quality Gate: FAILED** — $summaryText"
+            Write-Error "Quality Gate failed: $summaryText"
+            exit 1
+          }
+
+          Write-Host "QUALITY GATE: PASSED (minimum $threshold% for line, branch and method coverage)."
 
       - name: Append test and coverage reports to GitHub Summary
         if: always()
