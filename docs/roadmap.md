@@ -43,10 +43,10 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 ## Phase 2 — SWIG/pjproject mapping
 
 - [x] Inspect generated SWIG artifacts available from the package/repository.
-- [~] Model managed-to-SWIG relationships. Typed identified, textual, partial, and unknown nodes are implemented; formal quality-gate execution remains blocked by the local Microsoft Testing Platform/MSBuild named-pipe failure.
-- [~] Model native pjproject mappings where evidence exists. Typed wrapper/native nodes and partial chains are implemented without inferring mappings; formal quality-gate execution remains blocked by the local Microsoft Testing Platform/MSBuild named-pipe failure.
-- [~] Model ownership, callbacks, disposal, handles, and lifecycle semantics. Lifecycle facts are implemented with provenance and limitations; formal quality-gate execution remains blocked by the local Microsoft Testing Platform/MSBuild named-pipe failure.
-- [ ] Add platform-specific evidence and confidence.
+- [~] Model managed-to-SWIG relationships. Representative generated classes and PINVOKE calls are confirmed; full member-by-member correlation and native wrapper bodies remain unavailable.
+- [~] Model native pjproject mappings where evidence exists. PINVOKE entry points and the Makefile boundary are confirmed; the C++ wrapper and referenced interface inputs are unavailable, so pjproject endpoints remain partial/unknown.
+- [~] Model ownership, callbacks, disposal, handles, and lifecycle semantics. Class-specific generated-source facts are represented with provenance and limitations; broader type coverage remains incomplete.
+- [~] Add platform-specific evidence and confidence. Package-derived TFM/native-asset observations and separate confidence fields are implemented; runtime availability and exhaustive per-member platform coverage remain unverified.
 
 ## Phase 3 — MCP knowledge surface
 

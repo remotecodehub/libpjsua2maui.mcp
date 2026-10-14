@@ -11,7 +11,8 @@ public sealed record KnowledgeRelationship
         string source,
         string? target = null,
         FactProvenance? provenance = null,
-        KnowledgeFactStatus status = KnowledgeFactStatus.Established)
+        KnowledgeFactStatus status = KnowledgeFactStatus.Established,
+        KnowledgeConfidence confidence = KnowledgeConfidence.Unknown)
     {
         KnowledgeSet = knowledgeSet ?? throw new ArgumentNullException(nameof(knowledgeSet));
         RelationshipType = Required(relationshipType, nameof(relationshipType));
@@ -22,6 +23,7 @@ public sealed record KnowledgeRelationship
             ? new KnowledgeNodeReference(KnowledgeNodeKind.TextReference, KnowledgeNodeResolution.Unknown, null)
             : new KnowledgeNodeReference(KnowledgeNodeKind.TextReference, KnowledgeNodeResolution.TextReference, Target);
         Status = status;
+        Confidence = confidence;
         Provenance = provenance;
 
         if (provenance is not null && provenance.KnowledgeSet != knowledgeSet)
@@ -36,13 +38,15 @@ public sealed record KnowledgeRelationship
         KnowledgeNodeReference source,
         KnowledgeNodeReference? target,
         KnowledgeFactStatus status,
-        FactProvenance? provenance = null)
+        FactProvenance? provenance = null,
+        KnowledgeConfidence confidence = KnowledgeConfidence.Unknown)
     {
         KnowledgeSet = knowledgeSet ?? throw new ArgumentNullException(nameof(knowledgeSet));
         RelationshipType = Required(relationshipType, nameof(relationshipType));
         SourceNode = source ?? throw new ArgumentNullException(nameof(source));
         TargetNode = target ?? new KnowledgeNodeReference(KnowledgeNodeKind.TextReference, KnowledgeNodeResolution.Unknown, null);
         Status = status;
+        Confidence = confidence;
         Provenance = provenance;
         Source = source.Identifier ?? string.Empty;
         Target = TargetNode.Identifier;
@@ -66,6 +70,8 @@ public sealed record KnowledgeRelationship
     public KnowledgeNodeReference TargetNode { get; }
 
     public KnowledgeFactStatus Status { get; }
+
+    public KnowledgeConfidence Confidence { get; }
 
     public FactProvenance? Provenance { get; }
 

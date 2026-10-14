@@ -9,12 +9,14 @@ public sealed record LifecycleFact
         LifecycleFactKind kind,
         KnowledgeFactStatus status,
         string? value = null,
-        FactProvenance? provenance = null)
+        FactProvenance? provenance = null,
+        KnowledgeConfidence confidence = KnowledgeConfidence.Unknown)
     {
         KnowledgeSet = knowledgeSet ?? throw new ArgumentNullException(nameof(knowledgeSet));
         Subject = subject ?? throw new ArgumentNullException(nameof(subject));
         Kind = kind;
         Status = status;
+        Confidence = confidence;
         Value = string.IsNullOrWhiteSpace(value) ? null : value;
         Provenance = provenance;
 
@@ -31,6 +33,8 @@ public sealed record LifecycleFact
     public LifecycleFactKind Kind { get; }
 
     public KnowledgeFactStatus Status { get; }
+
+    public KnowledgeConfidence Confidence { get; }
 
     public string? Value { get; }
 

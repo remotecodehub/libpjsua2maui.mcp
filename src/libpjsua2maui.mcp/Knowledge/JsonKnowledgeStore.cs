@@ -78,7 +78,8 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         UnassociatedDocumentation = value.UnassociatedDocumentation.Select(DocumentationDto.From).ToArray(),
         Associations = value.Associations.Select(AssociationDto.From).ToArray(),
         Relationships = value.Relationships.Select(RelationshipDto.From).ToArray(),
-        LifecycleFacts = value.LifecycleFacts.Select(LifecycleFactDto.From).ToArray()
+        LifecycleFacts = value.LifecycleFacts.Select(LifecycleFactDto.From).ToArray(),
+        PlatformEvidence = value.PlatformEvidence.Select(PlatformEvidenceDto.From).ToArray()
     };
 
     private static IndexedKnowledgeSet FromDto(KnowledgeDto dto)
@@ -104,8 +105,9 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         var associations = (dto.Associations ?? throw new InvalidDataException("Associations are required")).Select(a => a.ToModel(docMap, symbolMap, identity)).ToArray();
         var relationships = (dto.Relationships ?? throw new InvalidDataException("Relationships are required.")).Select(r => r.ToModel(identity, artifactMap, symbolMap)).ToArray();
         var lifecycleFacts = (dto.LifecycleFacts ?? []).Select(f => f.ToModel(identity)).ToArray();
+        var platformEvidence = (dto.PlatformEvidence ?? []).Select(f => f.ToModel(identity)).ToArray();
         var manifest = new KnowledgeManifest(identity, dto.Metadata ?? throw new InvalidDataException("Metadata is required."), artifacts, status);
-        return new IndexedKnowledgeSet(manifest, symbols, docs, associations, unassociated, relationships, lifecycleFacts);
+        return new IndexedKnowledgeSet(manifest, symbols, docs, associations, unassociated, relationships, lifecycleFacts, platformEvidence);
     }
 
     private static bool TryParseEnum<T>(string? value, out T result) where T : struct, Enum
@@ -137,6 +139,7 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public AssociationDto[]? Associations { get; set; }
         public RelationshipDto[]? Relationships { get; set; }
         public LifecycleFactDto[]? LifecycleFacts { get; set; }
+        public PlatformEvidenceDto[]? PlatformEvidence { get; set; }
     }
 
     public sealed class ArtifactDto
@@ -227,20 +230,21 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public NodeDto? SourceNode { get; set; }
         public NodeDto? TargetNode { get; set; }
         public string? Status { get; set; }
+        public string? Confidence { get; set; }
         public ProvenanceDto? Provenance { get; set; }
-        public static RelationshipDto From(KnowledgeRelationship x) => new() { Type = x.RelationshipType, Source = x.Source, Target = x.Target, SourceNode = NodeDto.From(x.SourceNode), TargetNode = NodeDto.From(x.TargetNode), Status = x.Status.ToString(), Provenance = ProvenanceDto.From(x.Provenance) };
+        public static RelationshipDto From(KnowledgeRelationship x) => new() { Type = x.RelationshipType, Source = x.Source, Target = x.Target, SourceNode = NodeDto.From(x.SourceNode), TargetNode = NodeDto.From(x.TargetNode), Status = x.Status.ToString(), Confidence = x.Confidence.ToString(), Provenance = ProvenanceDto.From(x.Provenance) };
         public KnowledgeRelationship ToModel(KnowledgeSetIdentity identity, IReadOnlyDictionary<string, PackageArtifact> artifacts, IReadOnlyDictionary<string, SymbolRepresentation> symbols)
         {
             var provenance = Provenance?.ToModel(identity);
             if (provenance?.ArtifactPath is not null && !artifacts.ContainsKey(provenance.ArtifactPath)) throw new InvalidDataException("Relationship provenance references an unknown artifact.");
             if (provenance?.Symbol is not null && !symbols.Values.Any(symbol => symbol.Identity == provenance.Symbol)) throw new InvalidDataException("Relationship provenance references an unknown symbol.");
-            if (!TryParseEnum(Status ?? KnowledgeFactStatus.Established.ToString(), out KnowledgeFactStatus status)) throw new InvalidDataException("Invalid relationship status.");
+            if (!TryParseEnum(Status ?? KnowledgeFactStatus.Established.ToString(), out KnowledgeFactStatus status) || !TryParseEnum(Confidence ?? KnowledgeConfidence.Unknown.ToString(), out KnowledgeConfidence confidence)) throw new InvalidDataException("Invalid relationship status or confidence.");
             if (SourceNode is null)
             {
-                return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), Source ?? throw new InvalidDataException("Relationship source is required."), Target, provenance, status);
+                return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), Source ?? throw new InvalidDataException("Relationship source is required."), Target, provenance, status, confidence);
             }
 
-            return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), SourceNode.ToModel(), TargetNode?.ToModel(), status, provenance);
+            return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), SourceNode.ToModel(), TargetNode?.ToModel(), status, provenance, confidence);
         }
     }
 
@@ -262,13 +266,38 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public NodeDto? Subject { get; set; }
         public string? Kind { get; set; }
         public string? Status { get; set; }
+        public string? Confidence { get; set; }
         public string? Value { get; set; }
         public ProvenanceDto? Provenance { get; set; }
-        public static LifecycleFactDto From(LifecycleFact x) => new() { Subject = NodeDto.From(x.Subject), Kind = x.Kind.ToString(), Status = x.Status.ToString(), Value = x.Value, Provenance = ProvenanceDto.From(x.Provenance) };
+        public static LifecycleFactDto From(LifecycleFact x) => new() { Subject = NodeDto.From(x.Subject), Kind = x.Kind.ToString(), Status = x.Status.ToString(), Confidence = x.Confidence.ToString(), Value = x.Value, Provenance = ProvenanceDto.From(x.Provenance) };
         public LifecycleFact ToModel(KnowledgeSetIdentity identity)
         {
-            if (Subject is null || !TryParseEnum(Kind, out LifecycleFactKind kind) || !TryParseEnum(Status, out KnowledgeFactStatus status)) throw new InvalidDataException("Invalid lifecycle fact.");
-            return new LifecycleFact(identity, Subject.ToModel(), kind, status, Value, Provenance?.ToModel(identity));
+            if (Subject is null || !TryParseEnum(Kind, out LifecycleFactKind kind) || !TryParseEnum(Status, out KnowledgeFactStatus status) || !TryParseEnum(Confidence ?? KnowledgeConfidence.Unknown.ToString(), out KnowledgeConfidence confidence)) throw new InvalidDataException("Invalid lifecycle fact.");
+            return new LifecycleFact(identity, Subject.ToModel(), kind, status, Value, Provenance?.ToModel(identity), confidence);
+        }
+    }
+
+    public sealed class PlatformEvidenceDto
+    {
+        public NodeDto? Subject { get; set; }
+        public string? Platform { get; set; }
+        public string? TargetFramework { get; set; }
+        public string? RuntimeIdentifier { get; set; }
+        public string? ManagedAssembly { get; set; }
+        public string? NativeArtifact { get; set; }
+        public string? Confidence { get; set; }
+        public string? Limitations { get; set; }
+        public ProvenanceDto? Provenance { get; set; }
+        public static PlatformEvidenceDto From(PlatformEvidence x) => new()
+        {
+            Subject = NodeDto.From(x.Subject), Platform = x.Platform.ToString(), TargetFramework = x.TargetFramework,
+            RuntimeIdentifier = x.RuntimeIdentifier, ManagedAssembly = x.ManagedAssembly.ToString(), NativeArtifact = x.NativeArtifact.ToString(),
+            Confidence = x.Confidence.ToString(), Limitations = x.Limitations, Provenance = ProvenanceDto.From(x.Provenance)
+        };
+        public PlatformEvidence ToModel(KnowledgeSetIdentity identity)
+        {
+            if (Subject is null || !TryParseEnum(Platform, out KnowledgePlatform platform) || !TryParseEnum(ManagedAssembly, out PlatformArtifactStatus managed) || !TryParseEnum(NativeArtifact, out PlatformArtifactStatus native) || !TryParseEnum(Confidence, out KnowledgeConfidence confidence)) throw new InvalidDataException("Invalid platform evidence.");
+            return new PlatformEvidence(identity, Subject.ToModel(), platform, TargetFramework, RuntimeIdentifier, managed, native, confidence, Provenance?.ToModel(identity), Limitations);
         }
     }
 
@@ -280,10 +309,18 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public string? SymbolKind { get; set; }
         public string? SourceReference { get; set; }
         public string? Limitations { get; set; }
+        public string? Repository { get; set; }
+        public string? Revision { get; set; }
+        public string? Tag { get; set; }
+        public string? TargetFramework { get; set; }
+        public string? RuntimeIdentifier { get; set; }
+        public string? Evidence { get; set; }
         public static ProvenanceDto? From(FactProvenance? x) => x is null ? null : new()
         {
             Kind = x.Kind.ToString(), ArtifactPath = x.ArtifactPath, SymbolQualifiedName = x.Symbol?.QualifiedName,
-            SymbolKind = x.Symbol?.Kind.ToString(), SourceReference = x.SourceReference, Limitations = x.Limitations
+            SymbolKind = x.Symbol?.Kind.ToString(), SourceReference = x.SourceReference, Limitations = x.Limitations,
+            Repository = x.Repository, Revision = x.Revision, Tag = x.Tag, TargetFramework = x.TargetFramework,
+            RuntimeIdentifier = x.RuntimeIdentifier, Evidence = x.Evidence
         };
         public FactProvenance ToModel(KnowledgeSetIdentity identity)
         {
@@ -294,7 +331,7 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
                 if (!TryParseEnum(SymbolKind, out SymbolKind symbolKind)) throw new InvalidDataException("Invalid provenance symbol kind.");
                 symbol = new SymbolIdentity(SymbolQualifiedName, symbolKind);
             }
-            return new FactProvenance(identity, kind, ArtifactPath, symbol, SourceReference, Limitations);
+            return new FactProvenance(identity, kind, ArtifactPath, symbol, SourceReference, Limitations, Repository, Revision, Tag, TargetFramework, RuntimeIdentifier, Evidence);
         }
     }
 }

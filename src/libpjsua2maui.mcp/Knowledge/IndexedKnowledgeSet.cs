@@ -12,7 +12,8 @@ public sealed record IndexedKnowledgeSet
         IReadOnlyList<DocumentationAssociation> associations,
         IReadOnlyList<DocumentationRecord> unassociatedDocumentation,
         IReadOnlyList<KnowledgeRelationship>? relationships = null,
-        IReadOnlyList<LifecycleFact>? lifecycleFacts = null)
+        IReadOnlyList<LifecycleFact>? lifecycleFacts = null,
+        IReadOnlyList<PlatformEvidence>? platformEvidence = null)
     {
         Manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
         Symbols = Copy(symbols, nameof(symbols));
@@ -21,6 +22,7 @@ public sealed record IndexedKnowledgeSet
         UnassociatedDocumentation = Copy(unassociatedDocumentation, nameof(unassociatedDocumentation));
         Relationships = Copy(relationships ?? [], nameof(relationships));
         LifecycleFacts = Copy(lifecycleFacts ?? [], nameof(lifecycleFacts));
+        PlatformEvidence = Copy(platformEvidence ?? [], nameof(platformEvidence));
 
         if (manifest.Status != KnowledgeManifestStatus.Indexed)
         {
@@ -35,6 +37,7 @@ public sealed record IndexedKnowledgeSet
     public IReadOnlyList<DocumentationRecord> UnassociatedDocumentation { get; }
     public IReadOnlyList<KnowledgeRelationship> Relationships { get; }
     public IReadOnlyList<LifecycleFact> LifecycleFacts { get; }
+    public IReadOnlyList<PlatformEvidence> PlatformEvidence { get; }
 
     private static IReadOnlyList<T> Copy<T>(IReadOnlyList<T> values, string parameterName)
     {

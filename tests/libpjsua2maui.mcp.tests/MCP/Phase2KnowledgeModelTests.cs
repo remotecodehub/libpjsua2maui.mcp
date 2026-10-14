@@ -40,6 +40,11 @@ public sealed class Phase2KnowledgeModelTests
             Assert.Equal(LifecycleFactKind.Disposal, lifecycle.Kind);
             Assert.Equal(ProvenanceKind.RepositorySource, lifecycle.Provenance!.Kind);
             Assert.Contains("destruction", lifecycle.Provenance.Limitations!, StringComparison.Ordinal);
+            var platform = Assert.Single(loaded.PlatformEvidence);
+            Assert.Equal(KnowledgePlatform.Android, platform.Platform);
+            Assert.Equal(PlatformArtifactStatus.Present, platform.ManagedAssembly);
+            Assert.Equal(KnowledgeConfidence.Strong, platform.Confidence);
+            Assert.Contains("runtime", platform.Limitations!, StringComparison.Ordinal);
             Assert.DoesNotContain(Path.GetDirectoryName(path)!, Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)));
         }
         finally
@@ -104,6 +109,21 @@ public sealed class Phase2KnowledgeModelTests
     }
 
     [Fact]
+    public void PlatformEvidence_SeparatesArtifactStatusFromConfidence()
+    {
+        var extraction = CreateExtraction();
+        var identity = extraction.Acquisition.Manifest.Identity;
+        var subject = new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, "assembly:example.dll");
+        var evidence = new PlatformEvidence(identity, subject, KnowledgePlatform.Windows, "net10.0-windows", "win-x64", PlatformArtifactStatus.Present, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Strong, limitations: "Runtime not executed.");
+
+        Assert.Equal(PlatformArtifactStatus.Present, evidence.ManagedAssembly);
+        Assert.Equal(PlatformArtifactStatus.Unknown, evidence.NativeArtifact);
+        Assert.Equal(KnowledgeConfidence.Strong, evidence.Confidence);
+        Assert.Throws<ArgumentException>(() => new PlatformEvidence(identity, subject, KnowledgePlatform.Windows, "", null, PlatformArtifactStatus.Present, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Unknown));
+        Assert.Throws<ArgumentException>(() => new PlatformEvidence(identity, subject, KnowledgePlatform.Windows, "net10.0-windows", null, PlatformArtifactStatus.Present, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Unknown, new FactProvenance(new KnowledgeSetIdentity(new PackageIdentity("libpjsua2maui"), PackageVersion.Parse("2.17.0.5")), ProvenanceKind.PackageArtifact)));
+    }
+
+    [Fact]
     public void PersistenceDtos_RejectInvalidTypedEnrichment()
     {
         Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.NodeDto { Kind = "bad", Resolution = "Identified", Identifier = "x" }.ToModel());
@@ -128,6 +148,7 @@ public sealed class Phase2KnowledgeModelTests
         var source = new FactProvenance(identity, ProvenanceKind.RepositorySource, sourceReference: "src/libpjsua2maui/Platforms/Android/pjsua2maui/pjsua2/Account.cs", limitations: "Generated source does not identify a single pjproject symbol.");
         var relation = new KnowledgeRelationship(identity, "managed-to-native", managed, native, KnowledgeFactStatus.Partial, source);
         var lifecycle = new LifecycleFact(identity, managed, LifecycleFactKind.Disposal, KnowledgeFactStatus.Established, "Dispose clears HandleRef and conditionally invokes delete_Account.", new FactProvenance(identity, ProvenanceKind.RepositorySource, sourceReference: "src/libpjsua2maui/Platforms/Android/pjsua2maui/pjsua2/Account.cs", limitations: "The generated disposal path demonstrates native destruction only when swigCMemOwn is true."));
-        return new PackageExtractionResult(acquisition, [], [], [], [], [relation], [lifecycle]);
+        var platform = new PlatformEvidence(identity, managed, KnowledgePlatform.Android, "net10.0-android", "android-arm64", PlatformArtifactStatus.Present, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Strong, new FactProvenance(identity, ProvenanceKind.PackageArtifact, assembly.RelativePath, targetFramework: "net10.0-android", runtimeIdentifier: "android-arm64"), "Runtime loading was not executed.");
+        return new PackageExtractionResult(acquisition, [], [], [], [], [relation], [lifecycle], [platform]);
     }
 }

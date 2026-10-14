@@ -15,6 +15,7 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         ArgumentNullException.ThrowIfNull(acquisition);
         var symbols = new List<SymbolRepresentation>();
         var documentation = new List<DocumentationRecord>();
+        var platformEvidence = new List<PlatformEvidence>();
 
         await using var packageStream = new FileStream(acquisition.ArtifactPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
         using var archive = new System.IO.Compression.ZipArchive(packageStream, System.IO.Compression.ZipArchiveMode.Read);
@@ -46,6 +47,28 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
             }
 
             var xmlArtifact = acquisition.Manifest.Artifacts.Single(a => a.Kind == ArtifactKind.XmlDocumentation && a.TargetFramework == assemblyArtifact.TargetFramework);
+            var platform = GetPlatform(assemblyArtifact.TargetFramework);
+            var nativeArtifacts = acquisition.Manifest.Artifacts
+                .Where(a => a.Kind == ArtifactKind.NativeLibrary && IsNativeForPlatform(a.RelativePath, platform))
+                .ToArray();
+            platformEvidence.Add(new PlatformEvidence(
+                acquisition.Manifest.Identity,
+                new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, $"assembly:{assemblyArtifact.RelativePath}"),
+                platform,
+                assemblyArtifact.TargetFramework,
+                null,
+                PlatformArtifactStatus.Present,
+                nativeArtifacts.Length == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present,
+                nativeArtifacts.Length == 0 ? KnowledgeConfidence.Strong : KnowledgeConfidence.Confirmed,
+                new FactProvenance(
+                    acquisition.Manifest.Identity,
+                    ProvenanceKind.PackageArtifact,
+                    assemblyArtifact.RelativePath,
+                    sourceReference: string.Join(", ", nativeArtifacts.Select(a => a.RelativePath)),
+                    limitations: "Package assets establish distribution evidence only; runtime loading and symbol availability were not executed.",
+                    targetFramework: assemblyArtifact.TargetFramework,
+                    evidence: "Managed assembly and package native asset inventory."),
+                nativeArtifacts.Length == 0 ? "No matching native asset was identified in the acquired manifest." : null));
             try
             {
                 await using var input = entries[xmlArtifact.RelativePath].Open();
@@ -76,7 +99,7 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
             }
         }
 
-        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated);
+        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated, platformEvidence: platformEvidence);
     }
 
     private static bool IsPrimaryLibAssembly(PackageArtifact artifact)
@@ -84,6 +107,27 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         var parts = artifact.RelativePath.Split('/');
         return parts.Length == 3 && parts[0].Equals("lib", StringComparison.OrdinalIgnoreCase) &&
             parts[2].Equals("libpjsua2maui.dll", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static KnowledgePlatform GetPlatform(string? targetFramework)
+    {
+        if (targetFramework?.Contains("android", StringComparison.OrdinalIgnoreCase) == true) return KnowledgePlatform.Android;
+        if (targetFramework?.Contains("ios", StringComparison.OrdinalIgnoreCase) == true) return KnowledgePlatform.iOS;
+        if (targetFramework?.Contains("maccatalyst", StringComparison.OrdinalIgnoreCase) == true) return KnowledgePlatform.MacCatalyst;
+        if (targetFramework?.Contains("windows", StringComparison.OrdinalIgnoreCase) == true) return KnowledgePlatform.Windows;
+        return KnowledgePlatform.Unknown;
+    }
+
+    private static bool IsNativeForPlatform(string path, KnowledgePlatform platform)
+    {
+        return platform switch
+        {
+            KnowledgePlatform.Android => path.StartsWith("runtimes/android-", StringComparison.OrdinalIgnoreCase),
+            KnowledgePlatform.iOS => path.StartsWith("runtimes/ios", StringComparison.OrdinalIgnoreCase),
+            KnowledgePlatform.MacCatalyst => path.StartsWith("runtimes/maccatalyst-", StringComparison.OrdinalIgnoreCase),
+            KnowledgePlatform.Windows => path.StartsWith("runtimes/win-", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
     }
 
     private static IEnumerable<SymbolRepresentation> ReadSymbols(MetadataReader reader, PackageAcquisitionResult acquisition, PackageArtifact artifact)

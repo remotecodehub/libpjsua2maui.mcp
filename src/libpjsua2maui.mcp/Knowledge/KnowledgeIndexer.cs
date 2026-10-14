@@ -62,7 +62,8 @@ public sealed class KnowledgeIndexer : IKnowledgeIndexer
             "knowledge relationship");
 
         if (extraction.Relationships.Any(relationship => relationship.KnowledgeSet != identity) ||
-            extraction.LifecycleFacts.Any(fact => fact.KnowledgeSet != identity))
+            extraction.LifecycleFacts.Any(fact => fact.KnowledgeSet != identity) ||
+            extraction.PlatformEvidence.Any(evidence => evidence.KnowledgeSet != identity))
         {
             throw new InvalidDataException("Enrichment facts must belong to the extracted knowledge set.");
         }
@@ -73,7 +74,13 @@ public sealed class KnowledgeIndexer : IKnowledgeIndexer
             fact => $"{fact.KnowledgeSet}|{fact.Subject}|{fact.Kind}|{fact.Status}|{fact.Value}|{fact.Provenance}",
             "lifecycle fact");
 
-        return Task.FromResult(new IndexedKnowledgeSet(manifest, symbols, documentation, associations, unassociated, relationships, lifecycleFacts));
+        var platformEvidence = SortAndValidate(
+            extraction.PlatformEvidence,
+            evidence => $"{evidence.Subject}|{evidence.Platform}|{evidence.TargetFramework}|{evidence.RuntimeIdentifier}",
+            evidence => $"{evidence.KnowledgeSet}|{evidence.Subject}|{evidence.Platform}|{evidence.TargetFramework}|{evidence.RuntimeIdentifier}|{evidence.ManagedAssembly}|{evidence.NativeArtifact}|{evidence.Confidence}|{evidence.Provenance}|{evidence.Limitations}",
+            "platform evidence");
+
+        return Task.FromResult(new IndexedKnowledgeSet(manifest, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence));
     }
 
     private static IReadOnlyList<T> SortAndValidate<T>(IEnumerable<T> values, Func<T, string> key, Func<T, string> fingerprint, string name)
