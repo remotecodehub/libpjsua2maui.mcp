@@ -45,14 +45,12 @@ jobs:
         
       - name: Test
         id: test
-        shell: pwsh
-        working-directory: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/ 
+        shell: pwsh 
         continue-on-error: true
         run: |
           New-Item -ItemType Directory -Force -Path @(Join-Path '${{ env.TEST_RESULTS_DIR }}' 'QualityGate') | Out-Null
           $outputFile = Join-Path ${{ env.TEST_RESULTS_DIR }} test-output.txt
-          & dotnet build -t:QualityGate`
-            --configuration Release `
+          & dotnet test ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.dll --report-trx --report-trx-filename test-results.trx --results-directory "${{ env.TEST_RESULTS_DIR }}/QualityGate" --coverlet --coverlet-output-format cobertura `
             --v:detailed | Tee-Object -FilePath $outputFile
           $exitCode = $LASTEXITCODE
           "dotnet test exit code: $exitCode" | Add-Content -Path $outputFile
