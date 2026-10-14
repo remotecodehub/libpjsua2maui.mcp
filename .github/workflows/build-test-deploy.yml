@@ -19,11 +19,12 @@ permissions:
 
 env:
   DOTNET_VERSION: '10.0.x'
-  SOLUTION: libpjsua2maui.mcp.slnx
+  SOLUTION: libpjsua2maui.slnx
   HTTP_PROJECT: src/libpjsua2maui.mcp.http/libpjsua2maui.mcp.http.csproj
   STDIO_PROJECT: src/libpjsua2maui.mcp.stdio/libpjsua2maui.mcp.stdio.csproj
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/libpjsua2maui.mcp.http
   TEST_RESULTS_DIR: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/TestResults
+
 jobs:
   build:
     name: Continuous Integration / Testing
@@ -56,7 +57,7 @@ jobs:
           $outputFile = Join-Path $resultsDir 'test-output.txt'
           Write-Host "Executing tests through solution: $env:SOLUTION"
           Write-Host "Test results directory: $resultsDir"
-          & dotnet test $env:SOLUTION --configuration Release --no-build *> $outputFile
+          & dotnet test $env:SOLUTION --configuration Release --no-build -p:QualityGateResultsDirectory="$resultsDir" *> $outputFile
           $exitCode = $LASTEXITCODE
           Get-Content $outputFile
           "dotnet test exit code: $exitCode" | Add-Content -Path $outputFile
@@ -71,7 +72,7 @@ jobs:
         shell: pwsh
         env:
           TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
-        run: Get-ChildItem -Path $env:TEST_RESULTS_DIR -Recurse -File 
+        run: Get-ChildItem -Path $env:TEST_RESULTS_DIR -Recurse -File
 
       - name: Publish Test Summary
         uses: dorny/test-reporter@v3
@@ -85,7 +86,7 @@ jobs:
         if: always()
         shell: pwsh
         env:
-          TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
+          TEST_RESULTS_DIR: ${{ env:TEST_RESULTS_DIR }}
         run: |
           $ErrorActionPreference = 'Stop'
           $resultsDir = $env:TEST_RESULTS_DIR
