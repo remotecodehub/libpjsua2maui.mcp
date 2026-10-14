@@ -49,14 +49,13 @@ jobs:
       - name: Test
         id: test
         shell: pwsh
-        working-directory: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/
+        working-directory: ${{ github.workspace }}
         continue-on-error: true
         env:
           TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
         run: |
           $ErrorActionPreference = 'Stop'
           $resultsDir = $env:TEST_RESULTS_DIR
-          $testAssembly = Join-Path $env:GITHUB_WORKSPACE 'tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.dll'
           New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
 
           # Remove stale outputs so this run cannot accidentally consume artifacts from a previous run.
@@ -64,32 +63,25 @@ jobs:
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path (Join-Path $resultsDir 'QualityGate') | Out-Null
 
-          if (-not (Test-Path $testAssembly)) {
-            throw "Test assembly was not built: $testAssembly"
-          }
-
           $outputFile = Join-Path $resultsDir 'test-output.txt'
-          $trxFile = Join-Path $resultsDir 'test-results.trx'
-          $testArguments = @(
-            $testAssembly,
-            '--report-trx',
-            '--report-trx-filename', 'test-results.trx',
-            '--results-directory', $resultsDir,
-            '--coverlet',
-            '--coverlet-output-format', 'cobertura'
-          )
 
-          Write-Host "Executing Microsoft.Testing.Platform test assembly: $testAssembly"
-          Write-Host "TRX output directory: $resultsDir"
-          & dotnet test @testArguments *> $outputFile
+          # The test project is configured as a Microsoft.Testing.Platform test project.
+          # Run the solution through dotnet test so the test project is resolved by
+          # the normal .NET test target and its TestingPlatformCommandLineArguments
+          # supply the configured TRX and Coverlet options.
+          Write-Host "Executing tests through solution: $env:SOLUTION"
+          Write-Host "Test results directory: $resultsDir"
+          & dotnet test $env:SOLUTION --configuration Release --no-build *> $outputFile
           $exitCode = $LASTEXITCODE
           Get-Content $outputFile
           "dotnet test exit code: $exitCode" | Add-Content -Path $outputFile
           "TEST_EXIT_CODE=$exitCode" | Set-Content -Path (Join-Path $resultsDir 'test-exit-code.txt') -Encoding utf8
 
-          if (-not (Test-Path $trxFile)) {
-            Write-Warning "TRX file was not generated at expected path: $trxFile"
-            Get-ChildItem -Path $resultsDir -Recurse -File | Select-Object -ExpandProperty FullName | Write-Host
+          $trxFiles = @(Get-ChildItem -Path $resultsDir -Filter '*.trx' -File -Recurse -ErrorAction SilentlyContinue)
+          if ($trxFiles.Count -eq 0) {
+            Write-Warning "No TRX file was generated under $resultsDir."
+          } else {
+            $trxFiles | ForEach-Object { Write-Host "TRX: $($_.FullName)" }
           }
 
           $coverageFiles = @(Get-ChildItem -Path $resultsDir -Filter 'coverage.cobertura*.xml' -File -Recurse -ErrorAction SilentlyContinue)
@@ -327,7 +319,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: src/libpjsua2maui.mcp.http/Dockerfile
+          file: src/libpjsua2mcp.http/Dockerfile
           push: ${{ startsWith(github.ref, 'refs/tags/') }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
