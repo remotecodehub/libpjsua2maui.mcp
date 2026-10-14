@@ -35,10 +35,22 @@ Tools should answer focused agent questions rather than expose arbitrary file-sy
 
 Core query and parsing behavior must be unit tested. Include version/platform cases. Host tests should verify MCP registration and transport behavior. Tests must not require unavailable native Android/iOS/macOS binaries merely to validate package metadata behavior.
 
+### Mandatory coverage quality gate
+
+Before running tests that depend on repository-local .NET tools, run `dotnet tool restore` from the repository root. The mandatory quality-gate command, also executed from the repository root, is:
+
+```powershell
+dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
+```
+
+The test project's custom `QualityGate` target is the authoritative validation command. It executes tests, collects coverage, creates text/Markdown reports, and enforces a minimum of 90% for lines, branches, and methods. Each coverage dimension below 90% must produce its own warning, and any missed threshold must fail the target. Review the generated report and include the actual percentages and command result in implementation summaries. Do not lower the threshold, exclude relevant production code, or substitute plain `dotnet test` for the gate.
+
+If execution is blocked by an environment/tooling limitation, report the exact command and diagnostic to the user and pause the implementation workflow until the user adjusts the target and signals that work may resume. Do not delete or replace the existing `QualityGate` target. If necessary, an additional target may be added to parse the existing Coverlet/ReportGenerator text report for method coverage, but it must preserve the existing target and its rules.
+
 ## Dependencies
 
 Keep dependencies minimal. The core must remain independent from ASP.NET. Transport-specific packages belong in the corresponding host. Avoid adding a dependency solely to save a few lines of straightforward code.
 
 ## Documentation
 
-When behavior, public tools, architecture, package ingestion, or release behavior changes, update the corresponding document under `docs/`. Roadmap items should only be marked complete after their stated acceptance criteria are met.
+When behavior, public tools, architecture, package ingestion, or release behavior changes, update the corresponding document under `docs/`. Roadmap items should only be marked complete after their stated acceptance criteria are met and the mandatory quality gate passes.
