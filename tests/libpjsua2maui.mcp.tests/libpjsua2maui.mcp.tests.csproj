@@ -6,7 +6,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
-    <TestingPlatformCommandLineArguments>--report-trx --report-trx-filename test-results.trx --coverlet --coverlet-output-format cobertura</TestingPlatformCommandLineArguments>
+    <TestingPlatformCommandLineArguments>--report-trx --report-trx-filename test-results.trx --results-directory &quot;$(QualityGateResultsDirectory)&quot; --coverlet --coverlet-output-format cobertura</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <!-- Quality Gate -->
