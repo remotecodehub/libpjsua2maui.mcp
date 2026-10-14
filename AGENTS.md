@@ -1,11 +1,9 @@
 # AGENTS.md
 
 ## Purpose
-
 `libpjsua2maui.mcp` provides a dual-host MCP for agents developing .NET MAUI applications with the `libpjsua2maui` NuGet package. The shared class library owns MCP/domain behavior; the stdio host targets local/offline agents and the HTTP host targets containerized/shared agents.
 
 ## Mandatory first steps
-
 Before changing code, read:
 
 1. `docs/README.md`
@@ -17,13 +15,11 @@ Before changing code, read:
 Also inspect the current solution and existing project files before introducing new abstractions.
 
 ## Source of truth
-
 The MCP is a knowledge/query service, not a runtime replacement for pjproject. Its knowledge must be version-aware and should prefer the actually published `libpjsua2maui.nupkg`, generated C# SWIG bindings, XML documentation when available, and repository metadata over assumptions. Preserve provenance from C# symbol to SWIG/native pjproject mapping whenever that information can be established.
 
 `libpjsua2maui` wraps native pjproject per MAUI target. Do not assume that a managed type implies identical native availability on Android, iOS, MacCatalyst, and Windows.
 
 ## Architecture rules
-
 - Keep the shared MCP implementation in `src/libpjsua2maui.mcp`.
 - Keep transport/hosting concerns in `src/libpjsua2maui.mcp.stdio` and `src/libpjsua2maui.mcp.http`.
 - Keep all tests in `tests/libpjsua2maui.mcp.tests`.
@@ -37,7 +33,6 @@ The MCP is a knowledge/query service, not a runtime replacement for pjproject. I
 - Production projects must never reference the test project.
 
 ## C# implementation rules
-
 - Target the repository's configured .NET version and use modern .NET APIs and analyzers.
 - Prefer primary constructors where they improve clarity and do not obscure invariants.
 - Use nullable reference types and explicit null handling.
@@ -53,9 +48,17 @@ The MCP is a knowledge/query service, not a runtime replacement for pjproject. I
 - Avoid unnecessary comments; comments should explain decisions, constraints, native/platform behavior, or non-obvious protocol details.
 
 ## Testing and validation
+Every implementation stage must build the solution and run relevant tests. Add unit tests for core behavior before relying on host-level tests. Validate both hosts when transport code changes. Keep test fixtures and doubles isolated by test area. Do not claim support for a platform, package version, MCP feature, or native symbol without evidence.
 
-Every implementation stage must build the solution and run the relevant tests. Add unit tests for core behavior before relying on host-level tests. Validate both hosts when transport code changes. Keep test fixtures and doubles isolated by test area. Do not claim support for a platform, package version, MCP feature, or native symbol without evidence.
+**Mandatory test quality gate:** From the repository root, run `dotnet tool restore` before invoking repository-local tools. Then run exactly:
+
+```powershell
+dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
+```
+
+The custom `QualityGate` target runs tests, generates reports, and enforces at least 90% line, branch, and method coverage. A warning is emitted for each dimension below threshold and the target fails if any dimension is below 90%. A successful build or plain test run is not a substitute. Report the actual coverage percentages from the generated report and claim success only if the command exits successfully and all three dimensions meet the threshold.
+
+If the command is blocked by environment/tooling limitations, stop and notify the user with the exact command and error; do not silently bypass the gate, lower its threshold, or remove the existing target. Wait for the user to adjust the target and authorize resumption, unless an additional compatible target that preserves the existing one is clearly the appropriate fix.
 
 ## Git discipline
-
 Keep changes focused. Do not rewrite unrelated project files. Update documentation and roadmap status when architecture or capabilities change. Use clear conventional commit messages. Changes to `main` are allowed for repository bootstrap/documentation work when explicitly requested; implementation work should normally be reviewed through the repository's established workflow.
