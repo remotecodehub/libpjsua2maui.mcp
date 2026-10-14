@@ -204,7 +204,6 @@
       <QualityGateExecutableMethodFailed Condition="'$(QualityGateExecutableMethodCoverage)' &lt; '$(QualityGateThreshold)'">true</QualityGateExecutableMethodFailed>
     </PropertyGroup>
 
-    <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% $(if)" Condition="false" />
     <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% [$(QualityGateExecutableLineFailed)]" />
     <Message Importance="High" Text="Branch Coverage:  $(QualityGateExecutableBranchCoverage)% [$(QualityGateExecutableBranchFailed)]" />
     <Message Importance="High" Text="Method Coverage:  $(QualityGateExecutableMethodCoverage)% [$(QualityGateExecutableMethodFailed)]" />
