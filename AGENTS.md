@@ -17,6 +17,8 @@ Also inspect the current solution and existing project files before introducing 
 ## Source of truth
 The MCP is a knowledge/query service, not a runtime replacement for pjproject. Its knowledge must be version-aware and should prefer the actually published `libpjsua2maui.nupkg`, generated C# SWIG bindings, XML documentation when available, and repository metadata over assumptions. Preserve provenance from C# symbol to SWIG/native pjproject mapping whenever that information can be established.
 
+The repository at `/lib` is a Git submodule pinned to `libpjsua2maui` tag `v2.17.0.4` (commit `03e4cf1194b810085447d0b1add34fbb5a9c8d58`). Use `.github/skills/nupkg-nuget-mcp/SKILL.md` when inspecting the published package with NugetMcpServer. Keep package evidence, source-submodule evidence, and build-workflow evidence distinct: a file present in `/lib` is not necessarily present in the `.nupkg`.
+
 `libpjsua2maui` wraps native pjproject per MAUI target. Do not assume that a managed type implies identical native availability on Android, iOS, MacCatalyst, and Windows.
 
 ## Architecture rules
@@ -53,12 +55,12 @@ Every implementation stage must build the solution and run relevant tests. Add u
 **Mandatory test quality gate:** From the repository root, run `dotnet tool restore` before invoking repository-local tools. Then run:
 
 ```powershell
-dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
+dotnet build ./tests/libpjsua2mcp.tests/libpjsua2mcp.tests.csproj -c Release -t:QualityGate
 ```
 
 If the target is blocked by an environment/MSBuild invocation problem, capture the full error and use the supplemental executable path without removing or weakening `QualityGate`:
 1. Resolve the test executable path from build output and run `dotnet test <path-to-test-executable>` to verify test execution and Cobertura XML generation.
-2. Run `dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGateExecutable` to produce summary reports and enforce the same configured line, branch, and method thresholds.
+2. Run `dotnet build ./tests/libpjsua2mcp.tests/libpjsua2mcp.tests.csproj -c Release -t:QualityGateExecutable` to produce summary reports and enforce the same configured line, branch, and method thresholds.
 
 Inspect the actual coverage reports and command exit codes. A direct executable test run alone does not prove the quality gate passed. Report the real percentages and claim success only if the executable completed, all required metrics were parsed, and every dimension meets the threshold (90% by default). If both targets are blocked, stop and notify the user with exact commands and full relevant diagnostics; wait for the user to adjust the target and authorize resumption.
 
