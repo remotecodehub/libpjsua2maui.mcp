@@ -43,9 +43,9 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 ## Phase 2 — SWIG/pjproject mapping
 
 - [x] Inspect generated SWIG artifacts available from the package/repository.
-- [ ] Model managed-to-SWIG relationships.
-- [ ] Model native pjproject mappings where evidence exists.
-- [ ] Model ownership, callbacks, disposal, handles, and lifecycle semantics.
+- [~] Model managed-to-SWIG relationships. Typed identified, textual, partial, and unknown nodes are implemented; formal quality-gate execution remains blocked by the local Microsoft Testing Platform/MSBuild named-pipe failure.
+- [~] Model native pjproject mappings where evidence exists. Typed wrapper/native nodes and partial chains are implemented without inferring mappings; formal quality-gate execution remains blocked by the local Microsoft Testing Platform/MSBuild named-pipe failure.
+- [~] Model ownership, callbacks, disposal, handles, and lifecycle semantics. Lifecycle facts are implemented with provenance and limitations; formal quality-gate execution remains blocked by the local Microsoft Testing Platform/MSBuild named-pipe failure.
 - [ ] Add platform-specific evidence and confidence.
 
 ## Phase 3 — MCP knowledge surface

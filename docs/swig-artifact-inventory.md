@@ -70,7 +70,7 @@ The package DLLs may contain generated binding implementation details, but
 this check does not assign managed-to-SWIG relationships from metadata alone.
 The ZIP inventory does not prove the exact native wrapper symbols, ownership,
 callback, disposal, handle, lifecycle, or platform confidence semantics.
-Those are the four subsequent Phase 2 checks and remain pending.
+The model now preserves these observations without claiming that every managed symbol is mapped. Identified and partial nodes can be supplied by an enrichment source, while unresolved endpoints remain explicit. For the source evidence examined in Phase 2, `Account.cs` demonstrates ownership/disposal/handle/director behavior and the Makefile demonstrates the SWIG generation boundary; the package itself still does not publish those source artifacts.
 
 ## Reused mechanisms and change
 

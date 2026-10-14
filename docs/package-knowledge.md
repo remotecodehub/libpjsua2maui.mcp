@@ -87,6 +87,10 @@ Platform native artifact
 
 Not every node will exist for every symbol; partial mappings are valid.
 
+The Phase 2 model represents these nodes with `KnowledgeNodeReference`. Identified symbols carry a node kind and identifier; textual references are explicitly marked as such, and an unknown endpoint has no fabricated identifier. `KnowledgeRelationship` carries the relationship type, status, both node references, and existing `FactProvenance`. `LifecycleFact` uses the same identity and provenance contract for ownership, native handles, disposal/destruction, callbacks, dependencies, initialization/shutdown order, threading limits, and use-after-disposal risks. These records are persisted in the existing JSON schema shape with optional new fields, so older schema-1 documents without lifecycle facts remain readable.
+
+For the inspected `libpjsua2maui` `origin/main` source at commit `f59260dc020ce9fddc8e914d1f6d274dd8042a5a`, generated `Account.cs` demonstrates `HandleRef`, `swigCMemOwn`, finalization, `Dispose`, `delete_Account`, director connection, delegates, and callback forwarding. The Makefile demonstrates SWIG generation from `pjsua2.i` and `symbols.i`. These remain repository/source-of-generation evidence, not package artifacts. The `2.17.0.4` package inventory contains no separately published SWIG interface or generated wrapper source, so package-only indexing does not claim exact managed-to-SWIG/native mappings.
+
 ## Platform metadata
 
 Capture target frameworks, package assets, native libraries, runtime identifiers, architectures, and any build/package evidence that identifies platform availability. Distinguish compile-time managed availability from runtime native availability.

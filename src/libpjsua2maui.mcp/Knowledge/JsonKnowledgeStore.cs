@@ -77,7 +77,8 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         Documentation = value.Documentation.Select(DocumentationDto.From).ToArray(),
         UnassociatedDocumentation = value.UnassociatedDocumentation.Select(DocumentationDto.From).ToArray(),
         Associations = value.Associations.Select(AssociationDto.From).ToArray(),
-        Relationships = value.Relationships.Select(RelationshipDto.From).ToArray()
+        Relationships = value.Relationships.Select(RelationshipDto.From).ToArray(),
+        LifecycleFacts = value.LifecycleFacts.Select(LifecycleFactDto.From).ToArray()
     };
 
     private static IndexedKnowledgeSet FromDto(KnowledgeDto dto)
@@ -102,8 +103,9 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         var docMap = docs.ToDictionary(DocumentationKey, StringComparer.Ordinal);
         var associations = (dto.Associations ?? throw new InvalidDataException("Associations are required")).Select(a => a.ToModel(docMap, symbolMap, identity)).ToArray();
         var relationships = (dto.Relationships ?? throw new InvalidDataException("Relationships are required.")).Select(r => r.ToModel(identity, artifactMap, symbolMap)).ToArray();
+        var lifecycleFacts = (dto.LifecycleFacts ?? []).Select(f => f.ToModel(identity)).ToArray();
         var manifest = new KnowledgeManifest(identity, dto.Metadata ?? throw new InvalidDataException("Metadata is required."), artifacts, status);
-        return new IndexedKnowledgeSet(manifest, symbols, docs, associations, unassociated, relationships);
+        return new IndexedKnowledgeSet(manifest, symbols, docs, associations, unassociated, relationships, lifecycleFacts);
     }
 
     private static bool TryParseEnum<T>(string? value, out T result) where T : struct, Enum
@@ -134,6 +136,7 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public DocumentationDto[]? UnassociatedDocumentation { get; set; }
         public AssociationDto[]? Associations { get; set; }
         public RelationshipDto[]? Relationships { get; set; }
+        public LifecycleFactDto[]? LifecycleFacts { get; set; }
     }
 
     public sealed class ArtifactDto
@@ -221,14 +224,51 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public string? Type { get; set; }
         public string? Source { get; set; }
         public string? Target { get; set; }
+        public NodeDto? SourceNode { get; set; }
+        public NodeDto? TargetNode { get; set; }
+        public string? Status { get; set; }
         public ProvenanceDto? Provenance { get; set; }
-        public static RelationshipDto From(KnowledgeRelationship x) => new() { Type = x.RelationshipType, Source = x.Source, Target = x.Target, Provenance = ProvenanceDto.From(x.Provenance) };
+        public static RelationshipDto From(KnowledgeRelationship x) => new() { Type = x.RelationshipType, Source = x.Source, Target = x.Target, SourceNode = NodeDto.From(x.SourceNode), TargetNode = NodeDto.From(x.TargetNode), Status = x.Status.ToString(), Provenance = ProvenanceDto.From(x.Provenance) };
         public KnowledgeRelationship ToModel(KnowledgeSetIdentity identity, IReadOnlyDictionary<string, PackageArtifact> artifacts, IReadOnlyDictionary<string, SymbolRepresentation> symbols)
         {
             var provenance = Provenance?.ToModel(identity);
             if (provenance?.ArtifactPath is not null && !artifacts.ContainsKey(provenance.ArtifactPath)) throw new InvalidDataException("Relationship provenance references an unknown artifact.");
             if (provenance?.Symbol is not null && !symbols.Values.Any(symbol => symbol.Identity == provenance.Symbol)) throw new InvalidDataException("Relationship provenance references an unknown symbol.");
-            return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), Source ?? throw new InvalidDataException("Relationship source is required."), Target, provenance);
+            if (!TryParseEnum(Status ?? KnowledgeFactStatus.Established.ToString(), out KnowledgeFactStatus status)) throw new InvalidDataException("Invalid relationship status.");
+            if (SourceNode is null)
+            {
+                return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), Source ?? throw new InvalidDataException("Relationship source is required."), Target, provenance, status);
+            }
+
+            return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), SourceNode.ToModel(), TargetNode?.ToModel(), status, provenance);
+        }
+    }
+
+    public sealed class NodeDto
+    {
+        public string? Kind { get; set; }
+        public string? Resolution { get; set; }
+        public string? Identifier { get; set; }
+        public static NodeDto From(KnowledgeNodeReference x) => new() { Kind = x.Kind.ToString(), Resolution = x.Resolution.ToString(), Identifier = x.Identifier };
+        public KnowledgeNodeReference ToModel()
+        {
+            if (!TryParseEnum(Kind, out KnowledgeNodeKind kind) || !TryParseEnum(Resolution, out KnowledgeNodeResolution resolution)) throw new InvalidDataException("Invalid knowledge node reference.");
+            return new KnowledgeNodeReference(kind, resolution, Identifier);
+        }
+    }
+
+    public sealed class LifecycleFactDto
+    {
+        public NodeDto? Subject { get; set; }
+        public string? Kind { get; set; }
+        public string? Status { get; set; }
+        public string? Value { get; set; }
+        public ProvenanceDto? Provenance { get; set; }
+        public static LifecycleFactDto From(LifecycleFact x) => new() { Subject = NodeDto.From(x.Subject), Kind = x.Kind.ToString(), Status = x.Status.ToString(), Value = x.Value, Provenance = ProvenanceDto.From(x.Provenance) };
+        public LifecycleFact ToModel(KnowledgeSetIdentity identity)
+        {
+            if (Subject is null || !TryParseEnum(Kind, out LifecycleFactKind kind) || !TryParseEnum(Status, out KnowledgeFactStatus status)) throw new InvalidDataException("Invalid lifecycle fact.");
+            return new LifecycleFact(identity, Subject.ToModel(), kind, status, Value, Provenance?.ToModel(identity));
         }
     }
 

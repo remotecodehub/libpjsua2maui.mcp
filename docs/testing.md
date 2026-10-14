@@ -22,6 +22,10 @@ tests/libpjsua2maui.mcp.tests/
 
 Test package discovery, version identity, assembly/XML parsing, symbol indexing, search ranking/filtering, platform metadata, provenance, native mapping, and error handling without loading native pjproject binaries.
 
+Phase 2 tests also use deterministic synthetic enrichment records to verify typed managed/SWIG/native nodes, partial and unknown endpoints, lifecycle facts, conflict detection, version/set isolation, and JSON round-tripping. Repository evidence is represented in fixtures with repository provenance; it is not promoted to package provenance.
+
+The Phase 2 fixture suite executed 138 tests successfully in a direct Microsoft Testing Platform run and produced Cobertura reports. The repository quality targets still require an environment fix when launched as a child of MSBuild: this environment rejects the named-pipe handshake before test execution.
+
 ## MCP contract
 
 Test that every tool has a stable schema, validates required inputs, returns deterministic structured output, and exposes useful error information. Include empty-result and ambiguous-result cases.

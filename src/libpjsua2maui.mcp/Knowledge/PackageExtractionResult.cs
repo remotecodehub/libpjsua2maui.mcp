@@ -11,7 +11,8 @@ public sealed record PackageExtractionResult
         IReadOnlyList<DocumentationRecord> documentation,
         IReadOnlyList<DocumentationAssociation> associations,
         IReadOnlyList<DocumentationRecord> unassociatedDocumentation,
-        IReadOnlyList<KnowledgeRelationship>? relationships = null)
+        IReadOnlyList<KnowledgeRelationship>? relationships = null,
+        IReadOnlyList<LifecycleFact>? lifecycleFacts = null)
     {
         Acquisition = acquisition ?? throw new ArgumentNullException(nameof(acquisition));
         Symbols = Array.AsReadOnly((symbols ?? throw new ArgumentNullException(nameof(symbols))).ToArray());
@@ -19,6 +20,7 @@ public sealed record PackageExtractionResult
         Associations = Array.AsReadOnly((associations ?? throw new ArgumentNullException(nameof(associations))).ToArray());
         UnassociatedDocumentation = Array.AsReadOnly((unassociatedDocumentation ?? throw new ArgumentNullException(nameof(unassociatedDocumentation))).ToArray());
         Relationships = Array.AsReadOnly((relationships ?? []).ToArray());
+        LifecycleFacts = Array.AsReadOnly((lifecycleFacts ?? []).ToArray());
         Errors = new ReadOnlyCollection<string>([]);
     }
 
@@ -28,5 +30,6 @@ public sealed record PackageExtractionResult
     public IReadOnlyList<DocumentationAssociation> Associations { get; }
     public IReadOnlyList<DocumentationRecord> UnassociatedDocumentation { get; }
     public IReadOnlyList<KnowledgeRelationship> Relationships { get; }
+    public IReadOnlyList<LifecycleFact> LifecycleFacts { get; }
     public IReadOnlyList<string> Errors { get; }
 }

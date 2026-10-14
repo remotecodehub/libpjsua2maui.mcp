@@ -58,10 +58,22 @@ public sealed class KnowledgeIndexer : IKnowledgeIndexer
         var relationships = SortAndValidate(
             extraction.Relationships,
             relationship => $"{relationship.RelationshipType}|{relationship.Source}|{relationship.Target}",
-            relationship => $"{relationship.KnowledgeSet}|{relationship.RelationshipType}|{relationship.Source}|{relationship.Target}|{relationship.Provenance}",
+            relationship => $"{relationship.KnowledgeSet}|{relationship.RelationshipType}|{relationship.SourceNode}|{relationship.TargetNode}|{relationship.Status}|{relationship.Provenance}",
             "knowledge relationship");
 
-        return Task.FromResult(new IndexedKnowledgeSet(manifest, symbols, documentation, associations, unassociated, relationships));
+        if (extraction.Relationships.Any(relationship => relationship.KnowledgeSet != identity) ||
+            extraction.LifecycleFacts.Any(fact => fact.KnowledgeSet != identity))
+        {
+            throw new InvalidDataException("Enrichment facts must belong to the extracted knowledge set.");
+        }
+
+        var lifecycleFacts = SortAndValidate(
+            extraction.LifecycleFacts,
+            fact => $"{fact.Subject}|{fact.Kind}|{fact.Value}",
+            fact => $"{fact.KnowledgeSet}|{fact.Subject}|{fact.Kind}|{fact.Status}|{fact.Value}|{fact.Provenance}",
+            "lifecycle fact");
+
+        return Task.FromResult(new IndexedKnowledgeSet(manifest, symbols, documentation, associations, unassociated, relationships, lifecycleFacts));
     }
 
     private static IReadOnlyList<T> SortAndValidate<T>(IEnumerable<T> values, Func<T, string> key, Func<T, string> fingerprint, string name)

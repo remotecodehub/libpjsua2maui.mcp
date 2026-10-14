@@ -156,8 +156,8 @@
     <RemoveDir Directories="$(QualityGateResultsDirectory)" />
     <MakeDir Directories="$(QualityGateResultsDirectory)" />
 
-    <Exec Command="&quot;$(TargetPath)&quot; --report-trx --report-trx-filename test-results.trx --coverlet --coverlet-output-format cobertura"
-          WorkingDirectory="$(QualityGateResultsDirectory)"
+    <Exec Command="dotnet test &quot;bin\$(Configuration)\$(TargetFramework)\$(TargetName).exe&quot; -- --report-trx --report-trx-filename test-results.trx --coverlet --coverlet-output-format cobertura"
+          WorkingDirectory="$(MSBuildProjectDirectory)"
           ContinueOnError="true">
       <Output TaskParameter="ExitCode" PropertyName="QualityGateExecutableTestExitCode" />
     </Exec>
@@ -203,6 +203,10 @@
       <QualityGateExecutableBranchFailed Condition="'$(QualityGateExecutableBranchCoverage)' &lt; '$(QualityGateThreshold)'">true</QualityGateExecutableBranchFailed>
       <QualityGateExecutableMethodFailed Condition="'$(QualityGateExecutableMethodCoverage)' &lt; '$(QualityGateThreshold)'">true</QualityGateExecutableMethodFailed>
     </PropertyGroup>
+
+    <Warning Code="QG001" Text="Line coverage below threshold: $(QualityGateLineCoverage)% &lt; $(QualityGateThreshold)%." Condition="'$(QualityGateExecutableLineFailed)' == 'true'" />
+    <Warning Code="QG002" Text="Branch coverage below threshold: $(QualityGateBranchCoverage)% &lt; $(QualityGateThreshold)%." Condition="'$(QualityGateExecutableBranchFailed)' == 'true'" />
+    <Warning Code="QG003" Text="Method coverage below threshold: $(QualityGateMethodCoverage)% &lt; $(QualityGateThreshold)%." Condition="'$(QualityGateExecutableMethodFailed)' == 'true'" />
 
     <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% [PASSED]" Condition="'$(QualityGateExecutableLineFailed)' != 'true'" />
     <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% [FAILED]" Condition="'$(QualityGateExecutableLineFailed)' == 'true'" />

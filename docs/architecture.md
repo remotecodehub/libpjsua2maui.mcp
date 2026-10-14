@@ -16,6 +16,8 @@ libpjsua2maui.mcp.slnx
 
 The shared project owns package acquisition, metadata extraction, indexing, symbol models, query services, MCP tool/resource definitions, provenance, and validation rules. Hosts own only startup, configuration, dependency composition, and transport-specific protocol integration.
 
+Phase 2 enrichment remains in the shared knowledge pipeline. `KnowledgeRelationship` uses typed node references so managed, generated SWIG/wrapper, native pjproject, native artifact, textual, and unknown nodes are not conflated. `LifecycleFact` records ownership, handles, disposal, callbacks, dependencies, ordering, threading constraints, and use-after-disposal risks as evidence-backed observations. Partial, unknown, and conflicting facts are representable; no mapping is inferred from names alone.
+
 ## Hybrid deployment
 
 The stdio executable is the local/offline distribution. It should be usable by an agent without a network dependency after its package knowledge is installed/bundled. The HTTP application is the centralized distribution and is packaged as a Docker image for GHCR. Both hosts must invoke the same shared implementation.
