@@ -21,6 +21,8 @@ public sealed class PackageKnowledgeExtractorTests
         Assert.Contains(result.Symbols, symbol => symbol.Identity.Kind == SymbolKind.Field && symbol.Identity.QualifiedName.Contains("Constant", StringComparison.Ordinal));
         Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.Boolean", StringComparison.Ordinal) == true);
         Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.String[]", StringComparison.Ordinal) == true);
+        Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.Int32[,]", StringComparison.Ordinal) == true);
+        Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.Int32[,,]", StringComparison.Ordinal) == true);
         Assert.Contains(result.Symbols, symbol => symbol.Identity.QualifiedName.Contains(".Generic(", StringComparison.Ordinal));
         Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.Int32&", StringComparison.Ordinal) == true);
         Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.IntPtr", StringComparison.Ordinal) == true);
@@ -140,8 +142,40 @@ public sealed class PackageKnowledgeExtractorTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, cancellation.Token));
     }
 
+    [Theory]
+    [InlineData("net10.0-android", "runtimes/android-arm64/native/libpjsua2.so", KnowledgePlatform.Android)]
+    [InlineData("net10.0-ios", "runtimes/ios-arm64/native/libpjsua2.a", KnowledgePlatform.iOS)]
+    [InlineData("net10.0-maccatalyst", "runtimes/maccatalyst-arm64/native/libpjsua2.a", KnowledgePlatform.MacCatalyst)]
+    [InlineData("net10.0-windows", "runtimes/win-x64/native/pjsua2.dll", KnowledgePlatform.Windows)]
+    public async Task ExtractAsync_RecordsManagedAndNativePlatformEvidence(string tfm, string nativePath, KnowledgePlatform platform)
+    {
+        using var package = CreatePackage(tfm, typeof(PackageVersion).Assembly.Location, "<doc><members /></doc>", nativePath: nativePath);
 
-    private static TestPackage CreatePackage(string tfm, string? assemblyPath, string xml, string? assemblyContent = null)
+        var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+
+        var evidence = Assert.Single(result.PlatformEvidence);
+        Assert.Equal(platform, evidence.Platform);
+        Assert.Equal(tfm, evidence.TargetFramework);
+        Assert.Equal(PlatformArtifactStatus.Present, evidence.NativeArtifact);
+        Assert.Equal(KnowledgeConfidence.Confirmed, evidence.Confidence);
+        Assert.Contains(nativePath, evidence.Provenance!.SourceReference!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_LeavesUnknownPlatformEvidenceExplicit()
+    {
+        using var package = CreatePackage("net10.0", typeof(PackageVersion).Assembly.Location, "<doc><members /></doc>");
+
+        var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+
+        var evidence = Assert.Single(result.PlatformEvidence);
+        Assert.Equal(KnowledgePlatform.Unknown, evidence.Platform);
+        Assert.Equal(PlatformArtifactStatus.Unknown, evidence.NativeArtifact);
+        Assert.Equal(KnowledgeConfidence.Strong, evidence.Confidence);
+    }
+
+
+    private static TestPackage CreatePackage(string tfm, string? assemblyPath, string xml, string? assemblyContent = null, string? nativePath = null)
     {
         var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"libpjsua2maui-extractor-{Guid.NewGuid():N}.nupkg");
         using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -149,13 +183,23 @@ public sealed class PackageKnowledgeExtractorTests
         {
             AddEntry(archive, $"lib/{tfm}/libpjsua2maui.dll", assemblyContent is not null ? Encoding.UTF8.GetBytes(assemblyContent) : File.ReadAllBytes(assemblyPath!));
             AddEntry(archive, $"lib/{tfm}/libpjsua2maui.xml", Encoding.UTF8.GetBytes(xml));
+            if (nativePath is not null)
+            {
+                AddEntry(archive, nativePath, []);
+            }
         }
 
         var packageIdentity = new PackageIdentity("libpjsua2maui");
         var version = PackageVersion.Parse("2.17.0.4");
         var assembly = new PackageArtifact(packageIdentity, version, $"lib/{tfm}/libpjsua2maui.dll", ArtifactKind.ManagedAssembly, tfm);
         var documentation = new PackageArtifact(packageIdentity, version, $"lib/{tfm}/libpjsua2maui.xml", ArtifactKind.XmlDocumentation, tfm);
-        var manifest = new KnowledgeManifest(new KnowledgeSetIdentity(packageIdentity, version), artifacts: [assembly, documentation], status: KnowledgeManifestStatus.Validated);
+        var artifacts = new List<PackageArtifact> { assembly, documentation };
+        if (nativePath is not null)
+        {
+            var runtimeIdentifier = nativePath.Split('/')[1];
+            artifacts.Add(new PackageArtifact(packageIdentity, version, nativePath, ArtifactKind.NativeLibrary, runtimeIdentifier: runtimeIdentifier));
+        }
+        var manifest = new KnowledgeManifest(new KnowledgeSetIdentity(packageIdentity, version), artifacts: artifacts, status: KnowledgeManifestStatus.Validated);
         var validation = new PackageDocumentationValidation(version, new Dictionary<string, string> { [tfm] = documentation.RelativePath }, [tfm], []);
         return new TestPackage(new PackageAcquisitionResult(path, manifest, validation), path);
     }

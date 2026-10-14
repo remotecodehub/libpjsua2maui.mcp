@@ -44,7 +44,7 @@ public sealed class Phase2KnowledgeModelTests
             Assert.Equal(KnowledgePlatform.Android, platform.Platform);
             Assert.Equal(PlatformArtifactStatus.Present, platform.ManagedAssembly);
             Assert.Equal(KnowledgeConfidence.Strong, platform.Confidence);
-            Assert.Contains("runtime", platform.Limitations!, StringComparison.Ordinal);
+            Assert.Contains("runtime", platform.Limitations!, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(Path.GetDirectoryName(path)!, Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)));
         }
         finally
@@ -130,6 +130,7 @@ public sealed class Phase2KnowledgeModelTests
         Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "bad", Identifier = "x" }.ToModel());
         Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.LifecycleFactDto { Kind = "bad", Status = "Unknown", Subject = new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "Identified", Identifier = "x" } }.ToModel(CreateExtraction().Acquisition.Manifest.Identity));
         Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.LifecycleFactDto { Kind = "Ownership", Status = "bad", Subject = new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "Identified", Identifier = "x" } }.ToModel(CreateExtraction().Acquisition.Manifest.Identity));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.PlatformEvidenceDto { Platform = "bad", ManagedAssembly = "Present", NativeArtifact = "Unknown", Confidence = "Strong", Subject = new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "Identified", Identifier = "x" } }.ToModel(CreateExtraction().Acquisition.Manifest.Identity));
     }
 
     private static PackageExtractionResult CreateExtraction()

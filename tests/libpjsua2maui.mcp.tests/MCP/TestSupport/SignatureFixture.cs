@@ -46,6 +46,10 @@ public class SignatureFixture<T> : ISignatureFixture where T : class
 
     public string[] Array(string[] values) => values;
 
+    public int[,] Matrix(int[,] values) => values;
+
+    public int[,,] Cube(int[,,] values) => values;
+
     public List<T> Generic(List<T> values) => values;
 
     public T Echo<TValue>(TValue value) => Item!;

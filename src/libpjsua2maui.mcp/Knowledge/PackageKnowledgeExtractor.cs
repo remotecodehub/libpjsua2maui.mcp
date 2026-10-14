@@ -64,7 +64,7 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
                     acquisition.Manifest.Identity,
                     ProvenanceKind.PackageArtifact,
                     assemblyArtifact.RelativePath,
-                    sourceReference: string.Join(", ", nativeArtifacts.Select(a => a.RelativePath)),
+                    sourceReference: nativeArtifacts.Length == 0 ? null : string.Join(", ", nativeArtifacts.Select(a => a.RelativePath)),
                     limitations: "Package assets establish distribution evidence only; runtime loading and symbol availability were not executed.",
                     targetFramework: assemblyArtifact.TargetFramework,
                     evidence: "Managed assembly and package native asset inventory."),
