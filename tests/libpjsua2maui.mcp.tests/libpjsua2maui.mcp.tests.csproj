@@ -204,9 +204,12 @@
       <QualityGateExecutableMethodFailed Condition="'$(QualityGateExecutableMethodCoverage)' &lt; '$(QualityGateThreshold)'">true</QualityGateExecutableMethodFailed>
     </PropertyGroup>
 
-    <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% [$(QualityGateExecutableLineFailed)]" />
-    <Message Importance="High" Text="Branch Coverage:  $(QualityGateExecutableBranchCoverage)% [$(QualityGateExecutableBranchFailed)]" />
-    <Message Importance="High" Text="Method Coverage:  $(QualityGateExecutableMethodCoverage)% [$(QualityGateExecutableMethodFailed)]" />
+    <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% [PASSED]" Condition="'$(QualityGateExecutableLineFailed)' != 'true'" />
+    <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% [FAILED]" Condition="'$(QualityGateExecutableLineFailed)' == 'true'" />
+    <Message Importance="High" Text="Branch Coverage:  $(QualityGateExecutableBranchCoverage)% [PASSED]" Condition="'$(QualityGateExecutableBranchFailed)' != 'true'" />
+    <Message Importance="High" Text="Branch Coverage:  $(QualityGateExecutableBranchCoverage)% [FAILED]" Condition="'$(QualityGateExecutableBranchFailed)' == 'true'" />
+    <Message Importance="High" Text="Method Coverage:  $(QualityGateExecutableMethodCoverage)% [PASSED]" Condition="'$(QualityGateExecutableMethodFailed)' != 'true'" />
+    <Message Importance="High" Text="Method Coverage:  $(QualityGateExecutableMethodCoverage)% [FAILED]" Condition="'$(QualityGateExecutableMethodFailed)' == 'true'" />
     <Message Importance="High" Text="Required:         $(QualityGateThreshold)%" />
 
     <Error Condition="'$(QualityGateExecutableLineFailed)' == 'true' or '$(QualityGateExecutableBranchFailed)' == 'true' or '$(QualityGateExecutableMethodFailed)' == 'true'"
