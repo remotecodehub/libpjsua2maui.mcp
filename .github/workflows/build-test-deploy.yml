@@ -85,8 +85,6 @@ jobs:
       - name: Generate report
         if: always()
         shell: pwsh
-        env:
-          TEST_RESULTS_DIR: ${{ env:TEST_RESULTS_DIR }}
         run: |
           $ErrorActionPreference = 'Stop'
           $resultsDir = $env:TEST_RESULTS_DIR
