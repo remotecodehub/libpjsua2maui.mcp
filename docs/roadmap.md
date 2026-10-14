@@ -38,7 +38,7 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [x] Extract assembly metadata and XML documentation.
 - [x] Detect package assets, TFMs/RIDs and native artifacts.
 - [x] Implement deterministic indexing and persisted/bundled knowledge.
-- [ ] Add provenance to indexed facts.
+- [x] Add provenance to indexed facts.
 
 ## Phase 2 — SWIG/pjproject mapping
 

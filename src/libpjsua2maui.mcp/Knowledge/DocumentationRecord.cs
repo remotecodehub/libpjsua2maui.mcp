@@ -11,7 +11,8 @@ public sealed record DocumentationRecord
         string memberId,
         string content,
         PackageArtifact sourceArtifact,
-        string? targetFramework = null)
+        string? targetFramework = null,
+        FactProvenance? provenance = null)
     {
         Package = package ?? throw new ArgumentNullException(nameof(package));
         PackageVersion = packageVersion ?? throw new ArgumentNullException(nameof(packageVersion));
@@ -28,6 +29,13 @@ public sealed record DocumentationRecord
         MemberId = memberId;
         Content = content;
         TargetFramework = string.IsNullOrWhiteSpace(targetFramework) ? null : targetFramework;
+        Provenance = provenance;
+
+        if (provenance is not null &&
+            (provenance.KnowledgeSet.Package != package || provenance.KnowledgeSet.PackageVersion != packageVersion))
+        {
+            throw new ArgumentException("Documentation provenance must belong to the same package version.", nameof(provenance));
+        }
     }
 
     public PackageIdentity Package { get; }
@@ -41,4 +49,6 @@ public sealed record DocumentationRecord
     public PackageArtifact SourceArtifact { get; }
 
     public string? TargetFramework { get; }
+
+    public FactProvenance? Provenance { get; }
 }

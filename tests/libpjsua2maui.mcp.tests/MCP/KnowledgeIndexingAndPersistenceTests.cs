@@ -1,10 +1,281 @@
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using libpjsua2maui.mcp.Knowledge;
 
 namespace libpjsua2maui.mcp.tests.MCP;
 
 public sealed class KnowledgeIndexingAndPersistenceTests
 {
+    [Fact]
+    public async Task IndexAsync_RejectsNullCancellationAndUnvalidatedAcquisition()
+    {
+        var indexer = new KnowledgeIndexer();
+#pragma warning disable xUnit1051
+        await Assert.ThrowsAsync<ArgumentNullException>(() => indexer.IndexAsync(null!));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => indexer.IndexAsync(CreateExtraction(), cancellation.Token));
+
+        var extraction = CreateExtraction();
+        var manifest = new KnowledgeManifest(extraction.Acquisition.Manifest.Identity, extraction.Acquisition.Manifest.Metadata, extraction.Acquisition.Manifest.Artifacts);
+        var invalid = new PackageExtractionResult(
+            new PackageAcquisitionResult(extraction.Acquisition.ArtifactPath, manifest, extraction.Acquisition.Documentation),
+            extraction.Symbols, extraction.Documentation, extraction.Associations, extraction.UnassociatedDocumentation, extraction.Relationships);
+        await Assert.ThrowsAsync<InvalidDataException>(() => indexer.IndexAsync(invalid));
+#pragma warning restore xUnit1051
+    }
+
+    [Fact]
+    public async Task IndexAndPersist_AttachesAndRestoresFactProvenance()
+    {
+        var indexed = await new KnowledgeIndexer().IndexAsync(CreateExtraction(), TestContext.Current.CancellationToken);
+        var symbol = Assert.Single(indexed.Symbols, item => item.TargetFramework == "net10.0-android");
+        var documentation = Assert.Single(indexed.Documentation, item => item.MemberId == "M:Example.Call(System.String)");
+
+        Assert.All(indexed.Manifest.Artifacts, artifact => Assert.Equal(indexed.Manifest.Identity, artifact.Provenance!.KnowledgeSet));
+        Assert.Equal(symbol.Identity, symbol.Provenance!.Symbol);
+        Assert.Equal(documentation.SourceArtifact.RelativePath, documentation.Provenance!.ArtifactPath);
+        Assert.Contains("does not by itself", symbol.Provenance.Limitations);
+
+        var path = Path.Combine(Path.GetTempPath(), $"knowledge-provenance-{Guid.NewGuid():N}.json");
+        try
+        {
+            var store = new JsonKnowledgeStore();
+            await store.SaveAsync(path, indexed, TestContext.Current.CancellationToken);
+            var loaded = await store.LoadAsync(path, TestContext.Current.CancellationToken);
+            Assert.Equal(indexed.Manifest.Identity, loaded.Manifest.Identity);
+            Assert.Equal(symbol.Provenance, loaded.Symbols.Single(item => item.Identity == symbol.Identity).Provenance);
+            Assert.Equal(documentation.Provenance, loaded.Documentation.Single(item => item.MemberId == documentation.MemberId).Provenance);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("{")]
+    [InlineData("[]")]
+    public async Task LoadAsync_RejectsEmptyMalformedAndWrongRootJson(string json)
+    {
+        await AssertLoadRejectsAsync(json, typeof(InvalidDataException));
+    }
+
+    [Theory]
+    [InlineData("{\"schemaVersion\":1,\"packageId\":\"other\"}")]
+    [InlineData("{\"schemaVersion\":1,\"packageId\":\"libpjsua2maui\",\"packageVersion\":\"2.17.0.4\",\"manifestStatus\":\"1\"}")]
+    [InlineData("{\"schemaVersion\":1,\"packageId\":\"libpjsua2maui\",\"packageVersion\":\"2.17.0.4\",\"manifestStatus\":\"Indexed\",\"metadata\":{},\"artifacts\":[]}")]
+    public async Task LoadAsync_RejectsInvalidManifestAndMissingCollections(string json)
+    {
+        await AssertLoadRejectsAsync(json, typeof(InvalidDataException));
+    }
+
+    [Theory]
+    [InlineData("packageId")]
+    [InlineData("packageVersion")]
+    [InlineData("artifacts")]
+    [InlineData("documentation")]
+    [InlineData("unassociatedDocumentation")]
+    [InlineData("associations")]
+    [InlineData("relationships")]
+    [InlineData("metadata")]
+    public async Task LoadAsync_RejectsNullRequiredPersistedProperty(string propertyName)
+    {
+        var indexed = await new KnowledgeIndexer().IndexAsync(CreateExtraction(), TestContext.Current.CancellationToken);
+        var path = Path.Combine(Path.GetTempPath(), $"knowledge-null-{Guid.NewGuid():N}.json");
+        try
+        {
+            await new JsonKnowledgeStore().SaveAsync(path, indexed, TestContext.Current.CancellationToken);
+            var root = JsonNode.Parse(await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken))!.AsObject();
+            root[propertyName] = null;
+            await File.WriteAllTextAsync(path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = false }), TestContext.Current.CancellationToken);
+
+            await Assert.ThrowsAsync<InvalidDataException>(() => new JsonKnowledgeStore().LoadAsync(path, TestContext.Current.CancellationToken));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsInvalidEnumAndTraversalArtifact()
+    {
+        var json = """
+        {
+          "schemaVersion": 1,
+          "packageId": "libpjsua2maui",
+          "packageVersion": "2.17.0.4",
+          "manifestStatus": "Indexed",
+          "metadata": {},
+          "artifacts": [
+            { "path": "lib/../bad.dll", "kind": "ManagedAssembly" }
+          ],
+          "symbols": [], "documentation": [], "unassociatedDocumentation": [], "associations": [], "relationships": []
+        }
+        """;
+
+        await AssertLoadRejectsAsync(json, typeof(InvalidDataException));
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsConflictingArtifactIdentity()
+    {
+        var json = """
+        {
+          "schemaVersion": 1,
+          "packageId": "libpjsua2maui",
+          "packageVersion": "2.17.0.4",
+          "manifestStatus": "Indexed",
+          "metadata": {},
+          "artifacts": [
+            { "path": "lib/a.dll", "kind": "ManagedAssembly" },
+            { "path": "lib/a.dll", "kind": "NativeLibrary" }
+          ],
+          "symbols": [], "documentation": [], "unassociatedDocumentation": [], "associations": [], "relationships": []
+        }
+        """;
+
+        await AssertLoadRejectsAsync(json, typeof(Exception));
+    }
+
+    [Fact]
+    public async Task SaveAsync_HonorsCancellationBeforeCreatingFile()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var path = Path.Combine(Path.GetTempPath(), $"knowledge-cancel-{Guid.NewGuid():N}.json");
+
+        var indexed = await new KnowledgeIndexer().IndexAsync(CreateExtraction(), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<OperationCanceledException>(() => new JsonKnowledgeStore().SaveAsync(path, indexed, cancellation.Token));
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public async Task SaveAsync_CleansTemporaryFileWhenDestinationCannotBeReplaced()
+    {
+        var directory = new DirectoryInfo(Path.Combine(Path.GetTempPath(), $"knowledge-save-{Guid.NewGuid():N}"));
+        directory.Create();
+        var indexed = await new KnowledgeIndexer().IndexAsync(CreateExtraction(), TestContext.Current.CancellationToken);
+        var destination = Path.Combine(directory.FullName, "destination");
+        Directory.CreateDirectory(destination);
+        try
+        {
+            await Assert.ThrowsAnyAsync<Exception>(() => new JsonKnowledgeStore().SaveAsync(destination, indexed, TestContext.Current.CancellationToken));
+            Assert.Empty(directory.EnumerateFiles("*.tmp", SearchOption.TopDirectoryOnly));
+        }
+        finally
+        {
+            directory.Delete(true);
+        }
+    }
+
+    [Fact]
+    public void PersistenceDtos_RejectInvalidReferencesAndPreserveOptionalShapes()
+    {
+        var package = new PackageIdentity("libpjsua2maui");
+        var version = PackageVersion.Parse("2.17.0.4");
+        var identity = new KnowledgeSetIdentity(package, version, "dto");
+        var assembly = new PackageArtifact(package, version, "lib/a.dll", ArtifactKind.ManagedAssembly, "net10.0");
+        var xml = new PackageArtifact(package, version, "lib/a.xml", ArtifactKind.XmlDocumentation, "net10.0");
+        var artifacts = new Dictionary<string, PackageArtifact> { [assembly.RelativePath] = assembly, [xml.RelativePath] = xml };
+        var symbol = new SymbolRepresentation(package, version, new SymbolIdentity("Example.Type", SymbolKind.Class), "net10.0", assembly);
+        var documentation = new DocumentationRecord(package, version, "T:Example.Type", "content", xml, "net10.0");
+        var symbols = new Dictionary<string, SymbolRepresentation> { ["net10.0|Class|Example.Type||" ] = symbol };
+        var docs = new Dictionary<string, DocumentationRecord> { ["net10.0|T:Example.Type|lib/a.xml"] = documentation };
+
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib/a.dll", Kind = "999" }.ToModel(package, version, identity));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto
+        {
+            Path = "lib/a.dll",
+            Kind = "ManagedAssembly",
+            Provenance = new JsonKnowledgeStore.ProvenanceDto { Kind = "PackageArtifact", ArtifactPath = "lib/mismatch.dll" }
+        }.ToModel(package, version, identity));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.SymbolDto { QualifiedName = "Example.Type", Kind = "Class", ArtifactPath = "missing.dll" }.ToModel(package, version, artifacts, identity));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ParameterDto().ToModel());
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ParameterDto { Name = "value" }.ToModel());
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.DocumentationDto { MemberId = "T:Example.Type", Content = "content", ArtifactPath = "lib/a.dll" }.ToModel(package, version, artifacts, identity));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.AssociationDto { DocumentationKey = "missing", SymbolKey = "missing" }.ToModel(docs, symbols, identity));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.RelationshipDto { Type = "type", Source = "source", Provenance = new JsonKnowledgeStore.ProvenanceDto { Kind = "PackageArtifact", ArtifactPath = "missing.dll" } }.ToModel(identity, artifacts, symbols));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ProvenanceDto { Kind = "999" }.ToModel(identity));
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ProvenanceDto { Kind = "PackageArtifact", SymbolQualifiedName = "Example.Type" }.ToModel(identity));
+
+        var valid = new JsonKnowledgeStore.SymbolDto { QualifiedName = "Example.Type", Kind = "Class", TargetFramework = "net10.0", ArtifactPath = assembly.RelativePath }.ToModel(package, version, artifacts, identity);
+        Assert.Equal(symbol.Identity, valid.Identity);
+        Assert.Equal("content", new JsonKnowledgeStore.DocumentationDto { MemberId = documentation.MemberId, Content = documentation.Content, TargetFramework = "net10.0", ArtifactPath = xml.RelativePath }.ToModel(package, version, artifacts, identity).Content);
+        Assert.Null(new JsonKnowledgeStore.SymbolDto { QualifiedName = "Detached", Kind = "Class" }.ToModel(package, version, artifacts, identity).SourceArtifact);
+        Assert.Null(new JsonKnowledgeStore.DocumentationDto { MemberId = documentation.MemberId, Content = documentation.Content, TargetFramework = "net10.0", ArtifactPath = xml.RelativePath }.ToModel(package, version, artifacts, identity).Provenance);
+        Assert.Equal(documentation.MemberId, new JsonKnowledgeStore.AssociationDto
+        {
+            DocumentationKey = docs.Keys.Single(),
+            SymbolKey = symbols.Keys.Single()
+        }.ToModel(docs, symbols, identity).Documentation.MemberId);
+        Assert.Equal("source", new JsonKnowledgeStore.RelationshipDto { Type = "type", Source = "source" }
+            .ToModel(identity, artifacts, symbols).Source);
+        Assert.Null(new JsonKnowledgeStore.ProvenanceDto { Kind = "PackageArtifact" }.ToModel(identity).Symbol);
+        Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.AssociationDto
+        {
+            DocumentationKey = docs.Keys.Single(),
+            SymbolKey = symbols.Keys.Single()
+        }.ToModel(
+            new Dictionary<string, DocumentationRecord> { [docs.Keys.Single()] = new DocumentationRecord(package, version, documentation.MemberId, documentation.Content, xml, "net10.0-ios") },
+            symbols,
+            identity));
+    }
+
+    [Theory]
+    [InlineData("artifact-kind")]
+    [InlineData("artifact-path")]
+    [InlineData("artifact-rooted")]
+    [InlineData("artifact-backslash")]
+    [InlineData("artifact-empty-segment")]
+    [InlineData("symbol-kind")]
+    [InlineData("symbol-name")]
+    [InlineData("symbol-artifact")]
+    [InlineData("symbol-tfm")]
+    [InlineData("documentation-artifact")]
+    [InlineData("documentation-member")]
+    [InlineData("documentation-content")]
+    [InlineData("association-documentation")]
+    [InlineData("association-symbol")]
+    [InlineData("relationship-type")]
+    [InlineData("relationship-source")]
+    public void PersistenceDtos_TheoryRejectsInvalidShape(string scenario)
+    {
+        var package = new PackageIdentity("libpjsua2maui");
+        var version = PackageVersion.Parse("2.17.0.4");
+        var identity = new KnowledgeSetIdentity(package, version);
+        var assembly = new PackageArtifact(package, version, "lib/a.dll", ArtifactKind.ManagedAssembly, "net10.0");
+        var xml = new PackageArtifact(package, version, "lib/a.xml", ArtifactKind.XmlDocumentation, "net10.0");
+        var artifacts = new Dictionary<string, PackageArtifact> { [assembly.RelativePath] = assembly, [xml.RelativePath] = xml };
+        var symbol = new SymbolRepresentation(package, version, new SymbolIdentity("Example.Type", SymbolKind.Class), "net10.0", assembly);
+        var documentation = new DocumentationRecord(package, version, "T:Example.Type", "content", xml, "net10.0");
+        var symbols = new Dictionary<string, SymbolRepresentation> { ["symbol"] = symbol };
+        var docs = new Dictionary<string, DocumentationRecord> { ["documentation"] = documentation };
+
+        switch (scenario)
+        {
+            case "artifact-kind": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib/a.dll" }.ToModel(package, version, identity)); break;
+            case "artifact-path": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-rooted": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "C:/a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-backslash": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib\\a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "artifact-empty-segment": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.ArtifactDto { Path = "lib//a.dll", Kind = "ManagedAssembly" }.ToModel(package, version, identity)); break;
+            case "symbol-kind": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.SymbolDto { QualifiedName = "x" }.ToModel(package, version, artifacts, identity)); break;
+            case "symbol-name": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.SymbolDto { Kind = "Class" }.ToModel(package, version, artifacts, identity)); break;
+            case "symbol-artifact": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.SymbolDto { QualifiedName = "x", Kind = "Class", ArtifactPath = "missing" }.ToModel(package, version, artifacts, identity)); break;
+            case "symbol-tfm": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.SymbolDto { QualifiedName = "x", Kind = "Class", ArtifactPath = assembly.RelativePath, TargetFramework = "net10.0-ios" }.ToModel(package, version, artifacts, identity)); break;
+            case "documentation-artifact": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.DocumentationDto { MemberId = "T:x", Content = "x", ArtifactPath = assembly.RelativePath, TargetFramework = "net10.0" }.ToModel(package, version, artifacts, identity)); break;
+            case "documentation-member": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.DocumentationDto { Content = "x", ArtifactPath = xml.RelativePath, TargetFramework = "net10.0" }.ToModel(package, version, artifacts, identity)); break;
+            case "documentation-content": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.DocumentationDto { MemberId = "T:x", ArtifactPath = xml.RelativePath, TargetFramework = "net10.0" }.ToModel(package, version, artifacts, identity)); break;
+            case "association-documentation": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.AssociationDto { SymbolKey = "symbol" }.ToModel(docs, symbols, identity)); break;
+            case "association-symbol": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.AssociationDto { DocumentationKey = "documentation" }.ToModel(docs, symbols, identity)); break;
+            case "relationship-type": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.RelationshipDto { Source = "x" }.ToModel(identity, artifacts, symbols)); break;
+            case "relationship-source": Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.RelationshipDto { Type = "x" }.ToModel(identity, artifacts, symbols)); break;
+        }
+    }
     [Fact]
     public async Task IndexAndPersist_PreservesOverloadsRawDocumentationAndPlatformBoundaries()
     {
@@ -25,6 +296,8 @@ public sealed class KnowledgeIndexingAndPersistenceTests
             Assert.Contains("<returns>Raw XML</returns>", loaded.Documentation.Single(documentation => documentation.MemberId == "M:Example.Call(System.String)").Content);
             Assert.Single(loaded.UnassociatedDocumentation);
             Assert.Single(loaded.Associations);
+            Assert.Single(loaded.Relationships);
+            Assert.Contains("not established", loaded.Relationships[0].Provenance!.Limitations);
             Assert.DoesNotContain(Path.GetDirectoryName(path)!, Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)));
         }
         finally
@@ -90,6 +363,24 @@ public sealed class KnowledgeIndexingAndPersistenceTests
         var symbols = reverse ? new[] { android, ios } : new[] { ios, android };
         var docs = reverse ? new[] { unassociated, documentation } : new[] { documentation, unassociated };
         var association = new DocumentationAssociation(documentation, android);
-        return new PackageExtractionResult(acquisition, symbols, docs, [association], [unassociated]);
+        var relationship = new KnowledgeRelationship(identity, "managed-to-native", android.Identity.QualifiedName,
+            provenance: new FactProvenance(identity, ProvenanceKind.PackageArtifact, androidAssembly.RelativePath, android.Identity,
+                limitations: "Native mapping is not established."));
+        return new PackageExtractionResult(acquisition, symbols, docs, [association], [unassociated], [relationship]);
+    }
+
+    private static async Task AssertLoadRejectsAsync(string json, Type exceptionType)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"knowledge-invalid-{Guid.NewGuid():N}.json");
+        try
+        {
+            await File.WriteAllTextAsync(path, json, TestContext.Current.CancellationToken);
+            var exception = await Assert.ThrowsAnyAsync<Exception>(() => new JsonKnowledgeStore().LoadAsync(path, TestContext.Current.CancellationToken));
+            Assert.True(exceptionType.IsAssignableFrom(exception.GetType()), $"Expected {exceptionType}, got {exception.GetType()}.");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 }

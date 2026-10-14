@@ -7,6 +7,27 @@ namespace libpjsua2maui.mcp.tests.MCP;
 public sealed class PackageKnowledgeExtractorTests
 {
     [Fact]
+    public async Task ExtractAsync_ReadsMetadataSignatureShapesAndPublicMemberKinds()
+    {
+        using var package = CreatePackage("net10.0-android", typeof(TestSupport.SignatureFixture<>).Assembly.Location, "<doc><members /></doc>");
+
+        var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+
+        Assert.Contains(result.Symbols, symbol => symbol.Identity.Kind == SymbolKind.Interface && symbol.Identity.QualifiedName.Contains("ISignatureFixture", StringComparison.Ordinal));
+        Assert.Contains(result.Symbols, symbol => symbol.Identity.Kind == SymbolKind.Enum && symbol.Identity.QualifiedName.Contains("SignatureFixtureEnum", StringComparison.Ordinal));
+        Assert.Contains(result.Symbols, symbol => symbol.Identity.Kind == SymbolKind.Struct && symbol.Identity.QualifiedName.Contains("SignatureFixtureStruct", StringComparison.Ordinal));
+        Assert.Contains(result.Symbols, symbol => symbol.Identity.Kind == SymbolKind.Delegate && symbol.Identity.QualifiedName.Contains("SignatureFixtureDelegate", StringComparison.Ordinal));
+        Assert.Contains(result.Symbols, symbol => symbol.Identity.Kind == SymbolKind.Event && symbol.Identity.QualifiedName.Contains("Changed", StringComparison.Ordinal));
+        Assert.Contains(result.Symbols, symbol => symbol.Identity.Kind == SymbolKind.Field && symbol.Identity.QualifiedName.Contains("Constant", StringComparison.Ordinal));
+        Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.Boolean", StringComparison.Ordinal) == true);
+        Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.String[]", StringComparison.Ordinal) == true);
+        Assert.Contains(result.Symbols, symbol => symbol.Identity.QualifiedName.Contains(".Generic(", StringComparison.Ordinal));
+        Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.Int32&", StringComparison.Ordinal) == true);
+        Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("System.IntPtr", StringComparison.Ordinal) == true);
+        Assert.Contains(result.Symbols, symbol => symbol.Signature?.Contains("!!", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
     public async Task ExtractAsync_PreservesMemberContentWithoutSummaryAndAssociatesById()
     {
         using var package = CreatePackage("net10.0-android", typeof(PackageVersion).Assembly.Location,
@@ -104,6 +125,21 @@ public sealed class PackageKnowledgeExtractorTests
 
         Assert.Contains("lib/net10.0-android/libpjsua2maui.xml", exception.Message);
     }
+
+    [Fact]
+    public async Task ExtractAsync_PreservesValidEmptyDocumentationAndHonorsCancellation()
+    {
+        using var package = CreatePackage("net10.0-android", typeof(PackageVersion).Assembly.Location, "<doc><members /></doc>");
+        var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+        Assert.Empty(result.Documentation);
+        Assert.Empty(result.Associations);
+        Assert.Empty(result.UnassociatedDocumentation);
+
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, cancellation.Token));
+    }
+
 
     private static TestPackage CreatePackage(string tfm, string? assemblyPath, string xml, string? assemblyContent = null)
     {

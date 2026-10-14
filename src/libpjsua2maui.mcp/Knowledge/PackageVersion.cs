@@ -115,6 +115,16 @@ public sealed record PackageVersion : IComparable<PackageVersion>
     /// <inheritdoc />
     public override string ToString() => Value;
 
+    public bool Equals(PackageVersion? other)
+    {
+        return other is not null && CompareTo(other) == 0;
+    }
+
+    public override int GetHashCode()
+    {
+        return StringComparer.Ordinal.GetHashCode(Value);
+    }
+
     private static bool TryParseNumericParts(string value, out IReadOnlyList<int> parts)
     {
         var values = value.Split('.', StringSplitOptions.None);

@@ -14,7 +14,8 @@ public sealed record SymbolRepresentation
         string? documentationId = null,
         string? signature = null,
         IReadOnlyList<SymbolParameter>? parameters = null,
-        string? returnType = null)
+        string? returnType = null,
+        FactProvenance? provenance = null)
     {
         Package = package ?? throw new ArgumentNullException(nameof(package));
         PackageVersion = packageVersion ?? throw new ArgumentNullException(nameof(packageVersion));
@@ -25,11 +26,18 @@ public sealed record SymbolRepresentation
         Signature = string.IsNullOrWhiteSpace(signature) ? null : signature;
         Parameters = Array.AsReadOnly((parameters ?? []).ToArray());
         ReturnType = string.IsNullOrWhiteSpace(returnType) ? null : returnType;
+        Provenance = provenance;
 
         if (sourceArtifact is not null &&
             (sourceArtifact.Package != package || sourceArtifact.PackageVersion != packageVersion))
         {
             throw new ArgumentException("A symbol artifact must belong to the same package version.", nameof(sourceArtifact));
+        }
+
+        if (provenance is not null &&
+            (provenance.KnowledgeSet.Package != package || provenance.KnowledgeSet.PackageVersion != packageVersion))
+        {
+            throw new ArgumentException("Symbol provenance must belong to the same package version.", nameof(provenance));
         }
     }
 
@@ -50,4 +58,6 @@ public sealed record SymbolRepresentation
     public IReadOnlyList<SymbolParameter> Parameters { get; }
 
     public string? ReturnType { get; }
+
+    public FactProvenance? Provenance { get; }
 }

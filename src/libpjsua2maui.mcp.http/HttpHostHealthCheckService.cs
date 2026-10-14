@@ -7,15 +7,17 @@ namespace libpjsua2maui.mcp.http;
 /// </summary>
 public sealed class HttpHostHealthCheckService : IMcpHostHealthCheckService
 {
+    internal static string FormatVersion(Version? version)
+    {
+        return version?.ToString() ?? "unknown";
+    }
+
     /// <summary>
     /// Gets the current HTTP host status and assembly version.
     /// </summary>
     public McpHostHealthCheckResult GetStatus()
     {
-        var version = typeof(HttpHostHealthCheckService).Assembly
-            .GetName()
-            .Version?
-            .ToString() ?? "unknown";
+        var version = FormatVersion(typeof(HttpHostHealthCheckService).Assembly.GetName().Version);
 
         return new McpHostHealthCheckResult(
             Status: "Healthy",

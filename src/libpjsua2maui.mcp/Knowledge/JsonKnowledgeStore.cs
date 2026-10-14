@@ -43,8 +43,16 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         await using var stream = new FileStream(Path.GetFullPath(path), FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true);
-        var dto = await JsonSerializer.DeserializeAsync<KnowledgeDto>(stream, Options, cancellationToken)
-            ?? throw new InvalidDataException("The knowledge artifact is empty.");
+        KnowledgeDto dto;
+        try
+        {
+            dto = await JsonSerializer.DeserializeAsync<KnowledgeDto>(stream, Options, cancellationToken)
+                ?? throw new InvalidDataException("The knowledge artifact is empty.");
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException("The knowledge artifact is not valid JSON.", exception);
+        }
         if (dto.SchemaVersion != CurrentSchemaVersion)
         {
             throw new InvalidDataException($"Unsupported knowledge schema version {dto.SchemaVersion}; supported version is {CurrentSchemaVersion}.");
@@ -74,22 +82,39 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
 
     private static IndexedKnowledgeSet FromDto(KnowledgeDto dto)
     {
-        var package = new PackageIdentity(dto.PackageId ?? throw new InvalidDataException("Package ID is required."));
+        var packageId = dto.PackageId ?? throw new InvalidDataException("Package ID is required.");
+        if (!packageId.Equals("libpjsua2maui", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("The persisted package ID is not supported.");
+        }
+
+        var package = new PackageIdentity(packageId);
         var version = PackageVersion.Parse(dto.PackageVersion ?? throw new InvalidDataException("Package version is required."));
         var identity = new KnowledgeSetIdentity(package, version, dto.KnowledgeRevision);
-        if (!Enum.TryParse<KnowledgeManifestStatus>(dto.ManifestStatus, out var status) || status != KnowledgeManifestStatus.Indexed)
+        if (!TryParseEnum(dto.ManifestStatus, out KnowledgeManifestStatus status) || status != KnowledgeManifestStatus.Indexed)
             throw new InvalidDataException("The persisted manifest must have Indexed status.");
-        var artifacts = (dto.Artifacts ?? throw new InvalidDataException("Artifacts are required.")).Select(a => a.ToModel(package, version)).ToArray();
+        var artifacts = (dto.Artifacts ?? throw new InvalidDataException("Artifacts are required.")).Select(a => a.ToModel(package, version, identity)).ToArray();
         var artifactMap = artifacts.ToDictionary(a => a.RelativePath, StringComparer.Ordinal);
-        var symbols = (dto.Symbols ?? throw new InvalidDataException("Symbols are required.")).Select(s => s.ToModel(package, version, artifactMap)).ToArray();
-        var docs = (dto.Documentation ?? throw new InvalidDataException("Documentation is required")).Select(d => d.ToModel(package, version, artifactMap)).ToArray();
-        var unassociated = (dto.UnassociatedDocumentation ?? throw new InvalidDataException("Unassociated documentation is required")).Select(d => d.ToModel(package, version, artifactMap)).ToArray();
+        var symbols = (dto.Symbols ?? throw new InvalidDataException("Symbols are required.")).Select(s => s.ToModel(package, version, artifactMap, identity)).ToArray();
+        var docs = (dto.Documentation ?? throw new InvalidDataException("Documentation is required")).Select(d => d.ToModel(package, version, artifactMap, identity)).ToArray();
+        var unassociated = (dto.UnassociatedDocumentation ?? throw new InvalidDataException("Unassociated documentation is required")).Select(d => d.ToModel(package, version, artifactMap, identity)).ToArray();
         var symbolMap = symbols.ToDictionary(SymbolKey, StringComparer.Ordinal);
         var docMap = docs.ToDictionary(DocumentationKey, StringComparer.Ordinal);
         var associations = (dto.Associations ?? throw new InvalidDataException("Associations are required")).Select(a => a.ToModel(docMap, symbolMap, identity)).ToArray();
-        var relationships = (dto.Relationships ?? []).Select(r => r.ToModel(identity)).ToArray();
-        var manifest = new KnowledgeManifest(identity, dto.Metadata ?? new Dictionary<string, string>(), artifacts, status);
+        var relationships = (dto.Relationships ?? throw new InvalidDataException("Relationships are required.")).Select(r => r.ToModel(identity, artifactMap, symbolMap)).ToArray();
+        var manifest = new KnowledgeManifest(identity, dto.Metadata ?? throw new InvalidDataException("Metadata is required."), artifacts, status);
         return new IndexedKnowledgeSet(manifest, symbols, docs, associations, unassociated, relationships);
+    }
+
+    private static bool TryParseEnum<T>(string? value, out T result) where T : struct, Enum
+    {
+        if (value is not null && !int.TryParse(value, out _) && Enum.TryParse<T>(value, ignoreCase: false, out result) && Enum.IsDefined(result))
+        {
+            return true;
+        }
+
+        result = default;
+        return false;
     }
 
     private static string SymbolKey(SymbolRepresentation s) => $"{s.TargetFramework}|{s.Identity.Kind}|{s.Identity.QualifiedName}|{s.DocumentationId}|{s.Signature}";
@@ -117,12 +142,15 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public string? Kind { get; set; }
         public string? TargetFramework { get; set; }
         public string? RuntimeIdentifier { get; set; }
-        public static ArtifactDto From(PackageArtifact x) => new() { Path = x.RelativePath, Kind = x.Kind.ToString(), TargetFramework = x.TargetFramework, RuntimeIdentifier = x.RuntimeIdentifier };
-        public PackageArtifact ToModel(PackageIdentity p, PackageVersion v)
+        public ProvenanceDto? Provenance { get; set; }
+        public static ArtifactDto From(PackageArtifact x) => new() { Path = x.RelativePath, Kind = x.Kind.ToString(), TargetFramework = x.TargetFramework, RuntimeIdentifier = x.RuntimeIdentifier, Provenance = ProvenanceDto.From(x.Provenance) };
+        public PackageArtifact ToModel(PackageIdentity p, PackageVersion v, KnowledgeSetIdentity identity)
         {
             var artifactPath = Path;
-            if (!Enum.TryParse<ArtifactKind>(Kind, out var kind) || artifactPath is null || System.IO.Path.IsPathRooted(artifactPath) || artifactPath.Contains('\\')) throw new InvalidDataException("Invalid package artifact.");
-            return new PackageArtifact(p, v, artifactPath, kind, TargetFramework, RuntimeIdentifier);
+            if (!TryParseEnum(Kind, out ArtifactKind kind) || artifactPath is null || System.IO.Path.IsPathRooted(artifactPath) || artifactPath.Contains('\\') || artifactPath.Split('/').Any(segment => segment is "" or "." or "..")) throw new InvalidDataException("Invalid package artifact.");
+            var provenance = Provenance?.ToModel(identity);
+            if (provenance?.ArtifactPath is not null && !provenance.ArtifactPath.Equals(artifactPath, StringComparison.Ordinal)) throw new InvalidDataException("Artifact provenance does not reference the artifact.");
+            return new PackageArtifact(p, v, artifactPath, kind, TargetFramework, RuntimeIdentifier, provenance);
         }
     }
 
@@ -136,13 +164,16 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public string? Signature { get; set; }
         public ParameterDto[]? Parameters { get; set; }
         public string? ReturnType { get; set; }
-        public static SymbolDto From(SymbolRepresentation x) => new() { QualifiedName = x.Identity.QualifiedName, Kind = x.Identity.Kind.ToString(), TargetFramework = x.TargetFramework, ArtifactPath = x.SourceArtifact?.RelativePath, DocumentationId = x.DocumentationId, Signature = x.Signature, Parameters = x.Parameters.Select(ParameterDto.From).ToArray(), ReturnType = x.ReturnType };
-        public SymbolRepresentation ToModel(PackageIdentity p, PackageVersion v, IReadOnlyDictionary<string, PackageArtifact> artifacts)
+        public ProvenanceDto? Provenance { get; set; }
+        public static SymbolDto From(SymbolRepresentation x) => new() { QualifiedName = x.Identity.QualifiedName, Kind = x.Identity.Kind.ToString(), TargetFramework = x.TargetFramework, ArtifactPath = x.SourceArtifact?.RelativePath, DocumentationId = x.DocumentationId, Signature = x.Signature, Parameters = x.Parameters.Select(ParameterDto.From).ToArray(), ReturnType = x.ReturnType, Provenance = ProvenanceDto.From(x.Provenance) };
+        public SymbolRepresentation ToModel(PackageIdentity p, PackageVersion v, IReadOnlyDictionary<string, PackageArtifact> artifacts, KnowledgeSetIdentity identity)
         {
-            if (!Enum.TryParse<SymbolKind>(Kind, out var kind) || QualifiedName is null) throw new InvalidDataException("Invalid symbol identity.");
+            if (!TryParseEnum(Kind, out SymbolKind kind) || QualifiedName is null) throw new InvalidDataException("Invalid symbol identity.");
             PackageArtifact? artifact = null;
-            if (ArtifactPath is not null && (!artifacts.TryGetValue(ArtifactPath, out artifact) || artifact.PackageVersion != v)) throw new InvalidDataException("Invalid symbol artifact reference.");
-            return new SymbolRepresentation(p, v, new SymbolIdentity(QualifiedName, kind), TargetFramework, artifact, DocumentationId, Signature, (Parameters ?? []).Select(x => x.ToModel()).ToArray(), ReturnType);
+            if (ArtifactPath is not null && (!artifacts.TryGetValue(ArtifactPath, out artifact) || artifact.PackageVersion != v || artifact.TargetFramework != TargetFramework)) throw new InvalidDataException("Invalid symbol artifact reference.");
+            var provenance = Provenance?.ToModel(identity);
+            if (provenance?.ArtifactPath is not null && (artifact is null || !provenance.ArtifactPath.Equals(artifact.RelativePath, StringComparison.Ordinal))) throw new InvalidDataException("Symbol provenance does not reference the symbol artifact.");
+            return new SymbolRepresentation(p, v, new SymbolIdentity(QualifiedName, kind), TargetFramework, artifact, DocumentationId, Signature, (Parameters ?? []).Select(x => x.ToModel()).ToArray(), ReturnType, provenance);
         }
     }
 
@@ -161,11 +192,14 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public string? Content { get; set; }
         public string? ArtifactPath { get; set; }
         public string? TargetFramework { get; set; }
-        public static DocumentationDto From(DocumentationRecord x) => new() { MemberId = x.MemberId, Content = x.Content, ArtifactPath = x.SourceArtifact.RelativePath, TargetFramework = x.TargetFramework };
-        public DocumentationRecord ToModel(PackageIdentity p, PackageVersion v, IReadOnlyDictionary<string, PackageArtifact> artifacts)
+        public ProvenanceDto? Provenance { get; set; }
+        public static DocumentationDto From(DocumentationRecord x) => new() { MemberId = x.MemberId, Content = x.Content, ArtifactPath = x.SourceArtifact.RelativePath, TargetFramework = x.TargetFramework, Provenance = ProvenanceDto.From(x.Provenance) };
+        public DocumentationRecord ToModel(PackageIdentity p, PackageVersion v, IReadOnlyDictionary<string, PackageArtifact> artifacts, KnowledgeSetIdentity identity)
         {
-            if (ArtifactPath is null || !artifacts.TryGetValue(ArtifactPath, out var artifact) || artifact.Kind != ArtifactKind.XmlDocumentation) throw new InvalidDataException("Invalid documentation artifact reference.");
-            return new DocumentationRecord(p, v, MemberId ?? throw new InvalidDataException("Documentation member ID is required."), Content ?? throw new InvalidDataException("Documentation content is required."), artifact, TargetFramework);
+            if (ArtifactPath is null || !artifacts.TryGetValue(ArtifactPath, out var artifact) || artifact.Kind != ArtifactKind.XmlDocumentation || artifact.TargetFramework != TargetFramework) throw new InvalidDataException("Invalid documentation artifact reference.");
+            var provenance = Provenance?.ToModel(identity);
+            if (provenance?.ArtifactPath is not null && !provenance.ArtifactPath.Equals(artifact.RelativePath, StringComparison.Ordinal)) throw new InvalidDataException("Documentation provenance does not reference its artifact.");
+            return new DocumentationRecord(p, v, MemberId ?? throw new InvalidDataException("Documentation member ID is required."), Content ?? throw new InvalidDataException("Documentation content is required."), artifact, TargetFramework, provenance);
         }
     }
 
@@ -173,11 +207,12 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
     {
         public string? DocumentationKey { get; set; }
         public string? SymbolKey { get; set; }
-        public static AssociationDto From(DocumentationAssociation x) => new() { DocumentationKey = JsonKnowledgeStore.DocumentationKey(x.Documentation), SymbolKey = JsonKnowledgeStore.SymbolKey(x.Symbol) };
+        public ProvenanceDto? Provenance { get; set; }
+        public static AssociationDto From(DocumentationAssociation x) => new() { DocumentationKey = JsonKnowledgeStore.DocumentationKey(x.Documentation), SymbolKey = JsonKnowledgeStore.SymbolKey(x.Symbol), Provenance = ProvenanceDto.From(x.Provenance) };
         public DocumentationAssociation ToModel(IReadOnlyDictionary<string, DocumentationRecord> docs, IReadOnlyDictionary<string, SymbolRepresentation> symbols, KnowledgeSetIdentity identity)
         {
             if (DocumentationKey is null || SymbolKey is null || !docs.TryGetValue(DocumentationKey, out var doc) || !symbols.TryGetValue(SymbolKey, out var symbol) || doc.TargetFramework != symbol.TargetFramework) throw new InvalidDataException("Invalid documentation association reference.");
-            return new DocumentationAssociation(doc, symbol);
+            return new DocumentationAssociation(doc, symbol, Provenance?.ToModel(identity));
         }
     }
 
@@ -188,9 +223,11 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public string? Target { get; set; }
         public ProvenanceDto? Provenance { get; set; }
         public static RelationshipDto From(KnowledgeRelationship x) => new() { Type = x.RelationshipType, Source = x.Source, Target = x.Target, Provenance = ProvenanceDto.From(x.Provenance) };
-        public KnowledgeRelationship ToModel(KnowledgeSetIdentity identity)
+        public KnowledgeRelationship ToModel(KnowledgeSetIdentity identity, IReadOnlyDictionary<string, PackageArtifact> artifacts, IReadOnlyDictionary<string, SymbolRepresentation> symbols)
         {
             var provenance = Provenance?.ToModel(identity);
+            if (provenance?.ArtifactPath is not null && !artifacts.ContainsKey(provenance.ArtifactPath)) throw new InvalidDataException("Relationship provenance references an unknown artifact.");
+            if (provenance?.Symbol is not null && !symbols.Values.Any(symbol => symbol.Identity == provenance.Symbol)) throw new InvalidDataException("Relationship provenance references an unknown symbol.");
             return new KnowledgeRelationship(identity, Type ?? throw new InvalidDataException("Relationship type is required."), Source ?? throw new InvalidDataException("Relationship source is required."), Target, provenance);
         }
     }
@@ -210,11 +247,11 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         };
         public FactProvenance ToModel(KnowledgeSetIdentity identity)
         {
-            if (!Enum.TryParse<ProvenanceKind>(Kind, out var kind)) throw new InvalidDataException("Invalid provenance kind.");
+            if (!TryParseEnum(Kind, out ProvenanceKind kind)) throw new InvalidDataException("Invalid provenance kind.");
             SymbolIdentity? symbol = null;
             if (SymbolQualifiedName is not null)
             {
-                if (!Enum.TryParse<SymbolKind>(SymbolKind, out var symbolKind)) throw new InvalidDataException("Invalid provenance symbol kind.");
+                if (!TryParseEnum(SymbolKind, out SymbolKind symbolKind)) throw new InvalidDataException("Invalid provenance symbol kind.");
                 symbol = new SymbolIdentity(SymbolQualifiedName, symbolKind);
             }
             return new FactProvenance(identity, kind, ArtifactPath, symbol, SourceReference, Limitations);

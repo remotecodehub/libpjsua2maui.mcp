@@ -23,10 +23,10 @@ env:
   HTTP_PROJECT: src/libpjsua2maui.mcp.http/libpjsua2maui.mcp.http.csproj
   STDIO_PROJECT: src/libpjsua2maui.mcp.stdio/libpjsua2maui.mcp.stdio.csproj
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/libpjsua2maui.mcp.http
-
+  TEST_RESULTS_DIR: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/TestResults
 jobs:
   build:
-    name: Build .NET projects
+    name: Continuous Integration / Testing
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,15 +44,135 @@ jobs:
         run: dotnet build "${{ env.SOLUTION }}" --configuration Release --no-restore
         
       - name: Test
-        run: dotnet test "${{ env.SOLUTION }}" --configuration Release --no-restore --no-build
-        
+        id: test
+        shell: pwsh
+        working-directory: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/ 
+        continue-on-error: true
+        run: |
+          New-Item -ItemType Directory -Force -Path @(Join-Path '${{ env.TEST_RESULTS_DIR }}' 'QualityGate') | Out-Null
+          $outputFile = Join-Path ${{ env.TEST_RESULTS_DIR }} test-output.txt
+          & dotnet build -t:QualityGate`
+            --configuration Release `
+            --v:detailed | Tee-Object -FilePath $outputFile
+          $exitCode = $LASTEXITCODE
+          "dotnet test exit code: $exitCode" | Add-Content -Path $outputFile
+          "TEST_EXIT_CODE=$exitCode" | Out-File -FilePath ${{ env.TEST_RESULTS_DIR }}/QualityGate/test-exit-code.txt -Encoding utf8
+
+      - name: Debug generated artifacts
+        run: ls -R ${{ env.TEST_RESULTS_DIR }}
+    
       - name: Publish Test Summary
         uses: dorny/test-reporter@v3
         if: always()
         with:
           name: 'Continuous Test Results'
-          path: './TestResults/*.trx'
+          path: '${{ env.TEST_RESULTS_DIR }}/QualityGate/*.trx'
           reporter: 'dotnet-trx'
+
+      - name: Enforce quality gate (Line, Branch and Method coverage)
+        if: always()
+        shell: pwsh
+        env:
+          QUALITY_GRADE_THRESHOLD: 90
+        run: |
+          $summaryFile = Join-Path ${{ env.TEST_RESULTS_DIR }} "QualityGate/Report/Summary.txt"
+          if (-not (Test-Path $summaryFile)) {
+              "## Coverage gate`n`nThe ReportGenerator Summary.txt report was not produced." | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              Write-Error "Summary coverage data was not produced."
+              exit 1
+          }
+          
+          $content = Get-Content $summaryFile -Raw
+          $threshold = [double]$env:QUALITY_GRADE_THRESHOLD
+
+          # Extração dos dados do cabeçalho do Summary.txt
+          $lineMatch = [regex]::Match($content, '(?im)^\s*Line coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
+          $methodMatch = [regex]::Match($content, '(?im)^\s*Method coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
+          $branchMatch = [regex]::Match($content, '(?im)^\s*Branch coverage:\s*([0-9]+(?:\.[0-9]+)?)%')
+          $coveredBranchesMatch = [regex]::Match($content, '(?im)^\s*Covered branches:\s*([0-9]+)')
+          $totalBranchesMatch = [regex]::Match($content, '(?im)^\s*Total branches:\s*([0-9]+)')
+
+          if (-not $lineMatch.Success -or -not$methodMatch.Success) {
+              Write-Error "Quality Gate aborted: unable to extract line or method coverage data from Summary.txt."
+              exit 1
+          }
+
+          $lineRate = [double]$lineMatch.Groups[1].Value
+          $methodRate = [double]$methodMatch.Groups[1].Value
+
+          # Cálculo/Extração de Branch Coverage robusto
+          $branchRate = 0
+          if ($branchMatch.Success) {
+              $branchRate = [double]$branchMatch.Groups[1].Value
+          } elseif ($coveredBranchesMatch.Success -and$totalBranchesMatch.Success) {
+              $cb = [double]$coveredBranchesMatch.Groups[1].Value
+              $tb = [double]$totalBranchesMatch.Groups[1].Value
+              if ($tb -eq 0) {
+                  $branchRate = 100.0             } else {$branchRate = [math]::Round(($cb * 100 / $tb), 1)
+              }
+          } else {
+              Write-Error "Quality Gate aborted: unable to extract branch coverage data from Summary.txt."
+              exit 1
+          }
+
+          # Status visuais para o resumo
+          $lineStatus = if ($lineRate -ge$threshold) { '✅' } else { '❌' }
+          $branchStatus = if ($branchRate -ge $threshold) { '✅' } else { '❌' }
+          $methodStatus = if ($methodRate -ge$threshold) { '✅' } else { '❌' }
+
+          # Escrevendo no Summary do GitHub Actions
+          @"
+          ## Coverage gate
+          | Metric | Result | Minimum | Status |
+          | --- | ---: | ---: | ---: |
+          | Line coverage | $([math]::Round($lineRate, 2))% | $threshold\% | $lineStatus |
+          | Branch coverage | $([math]::Round($branchRate, 2))% | $threshold\% | $branchStatus |
+          | Method coverage | $([math]::Round($methodRate, 2))% | $threshold\% | $methodStatus |
+          "@ | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+          # Salvando os arquivos de texto auxiliares
+          $qualityGateDir = Join-Path ${{ env.TEST_RESULTS_DIR }} "QualityGate"
+          if (-not (Test-Path $qualityGateDir)) { New-Item -ItemType Directory -Path$qualityGateDir | Out-Null }
+          
+          "$([math]::Round($lineRate, 2))" | Out-File (Join-Path $qualityGateDir "line-rate.txt") -Encoding utf8
+          "$([math]::Round($branchRate, 2))" | Out-File (Join-Path $qualityGateDir "branch-rate.txt") -Encoding utf8
+          "$([math]::Round($methodRate, 2))" | Out-File (Join-Path $qualityGateDir "method-rate.txt") -Encoding utf8
+
+          # Validação das regras de Quality Gate
+          $failed = $false
+          $failures = @()
+
+          if ($lineRate -lt $threshold) {
+              $failed = $true
+              $failures += "Line coverage ($([math]::Round($lineRate, 2))\%) is below the required $threshold%."
+          }
+          if ($branchRate -lt $threshold) {
+            $failed = $true
+            $failures += "Branch coverage ($([math]::Round($branchRate, 2))\%) is below the required $threshold%."
+          }
+          if ($methodRate -lt $threshold) {
+              $failed = $true
+              $failures += "Method coverage ($([math]::Round($methodRate, 2))\%) is below the required $threshold%."
+          }
+
+          if ($failed) {
+              $summaryText =$failures -join " "
+              Write-Warning "Quality Gate failed: $summaryText"
+              exit 1
+          }
+
+      - name: Append test execution report
+        if: always()
+        shell: pwsh
+        run: if (Test-Path ${{ env.TEST_RESULTS_DIR }}/QualityGate/Report/Summary.md) { Get-Content ${{ env.TEST_RESULTS_DIR }}/QualityGate/Report/Summary.md | Add-Content $env:GITHUB_STEP_SUMMARY } else { Add-Content $env:GITHUB_STEP_SUMMARY 'Coverage report was not generated.' }
+
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: Continuous-Testing-Reports
+          path: ${{ env.TEST_RESULTS_DIR }}
+          if-no-files-found: warn
 
   docker:
     name: Build HTTP Docker image
@@ -95,7 +215,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   nuget:
-    name: Publish stdio dotnet tool
+    name: Continuous Delivery
     runs-on: ubuntu-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/')

@@ -11,7 +11,8 @@ public sealed record PackageArtifact
         string relativePath,
         ArtifactKind kind,
         string? targetFramework = null,
-        string? runtimeIdentifier = null)
+        string? runtimeIdentifier = null,
+        FactProvenance? provenance = null)
     {
         Package = package ?? throw new ArgumentNullException(nameof(package));
         PackageVersion = packageVersion ?? throw new ArgumentNullException(nameof(packageVersion));
@@ -19,6 +20,13 @@ public sealed record PackageArtifact
         Kind = kind;
         TargetFramework = OptionalIdentifier(targetFramework, nameof(targetFramework));
         RuntimeIdentifier = OptionalIdentifier(runtimeIdentifier, nameof(runtimeIdentifier));
+        Provenance = provenance;
+
+        if (provenance is not null &&
+            (provenance.KnowledgeSet.Package != package || provenance.KnowledgeSet.PackageVersion != packageVersion))
+        {
+            throw new ArgumentException("Artifact provenance must belong to the same package version.", nameof(provenance));
+        }
     }
 
     public PackageIdentity Package { get; }
@@ -33,10 +41,13 @@ public sealed record PackageArtifact
 
     public string? RuntimeIdentifier { get; }
 
+    public FactProvenance? Provenance { get; }
+
     private static string RequirePath(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        if (Path.IsPathRooted(value) || value.Contains('\\'))
+        var segments = value.Replace('\\', '/').Split('/');
+        if (Path.IsPathRooted(value) || value.Contains('\\') || segments.Any(segment => segment is "" or "." or ".."))
         {
             throw new ArgumentException("Artifact paths must be relative package paths using '/'.", nameof(value));
         }
