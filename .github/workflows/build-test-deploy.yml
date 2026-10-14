@@ -40,6 +40,9 @@ jobs:
       - name: Restore
         run: dotnet restore "${{ env.SOLUTION }}"
 
+      - name: Restore Tools
+        run: dotnet tool restore
+      
       - name: Build
         run: dotnet build "${{ env.SOLUTION }}" --configuration Release --no-restore
         
@@ -50,11 +53,11 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path @(Join-Path '${{ env.TEST_RESULTS_DIR }}' 'QualityGate') | Out-Null
           $outputFile = Join-Path ${{ env.TEST_RESULTS_DIR }} test-output.txt
-          & dotnet test ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.dll --report-trx --report-trx-filename test-results.trx --results-directory "${{ env.TEST_RESULTS_DIR }}/QualityGate" --coverlet --coverlet-output-format cobertura `
+          & dotnet test ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.dll --report-trx --report-trx-filename test-results.trx --results-directory "${{ env.TEST_RESULTS_DIR }}" --coverlet --coverlet-output-format cobertura `
             --v:detailed | Tee-Object -FilePath $outputFile
           $exitCode = $LASTEXITCODE
           "dotnet test exit code: $exitCode" | Add-Content -Path $outputFile
-          "TEST_EXIT_CODE=$exitCode" | Out-File -FilePath ${{ env.TEST_RESULTS_DIR }}/QualityGate/test-exit-code.txt -Encoding utf8
+          "TEST_EXIT_CODE=$exitCode" | Out-File -FilePath ${{ env.TEST_RESULTS_DIR }}/test-exit-code.txt -Encoding utf8
 
       - name: Debug generated artifacts
         run: ls -R ${{ env.TEST_RESULTS_DIR }}
@@ -64,8 +67,11 @@ jobs:
         if: always()
         with:
           name: 'Continuous Test Results'
-          path: '${{ env.TEST_RESULTS_DIR }}/QualityGate/*.trx'
+          path: '${{ env.TEST_RESULTS_DIR }}/*.trx'
           reporter: 'dotnet-trx'
+
+      - name: Generate report
+        run: dotnet tool run reportgenerator -reports:"${{ env.TEST_RESULTS_DIR }}/coverage.cobertura.*.xml" -targetdir:"${{ env.TEST_RESULTS_DIR }}/Report" -reporttypes:"MarkdownSummary;TextSummary" -classfilters:"+libpjsua2maui.mcp*;-Program"
 
       - name: Enforce quality gate (Line, Branch and Method coverage)
         if: always()
@@ -73,7 +79,7 @@ jobs:
         env:
           QUALITY_GRADE_THRESHOLD: 90
         run: |
-          $summaryFile = Join-Path ${{ env.TEST_RESULTS_DIR }} "QualityGate/Report/Summary.txt"
+          $summaryFile = Join-Path ${{ env.TEST_RESULTS_DIR }} "/Report/Summary.txt"
           if (-not (Test-Path $summaryFile)) {
               "## Coverage gate`n`nThe ReportGenerator Summary.txt report was not produced." | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
               Write-Error "Summary coverage data was not produced."
@@ -129,7 +135,7 @@ jobs:
           "@ | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
           # Salvando os arquivos de texto auxiliares
-          $qualityGateDir = Join-Path ${{ env.TEST_RESULTS_DIR }} "QualityGate"
+          $qualityGateDir = ${{ env.TEST_RESULTS_DIR }} 
           if (-not (Test-Path $qualityGateDir)) { New-Item -ItemType Directory -Path$qualityGateDir | Out-Null }
           
           "$([math]::Round($lineRate, 2))" | Out-File (Join-Path $qualityGateDir "line-rate.txt") -Encoding utf8
@@ -162,7 +168,7 @@ jobs:
       - name: Append test execution report
         if: always()
         shell: pwsh
-        run: if (Test-Path ${{ env.TEST_RESULTS_DIR }}/QualityGate/Report/Summary.md) { Get-Content ${{ env.TEST_RESULTS_DIR }}/QualityGate/Report/Summary.md | Add-Content $env:GITHUB_STEP_SUMMARY } else { Add-Content $env:GITHUB_STEP_SUMMARY 'Coverage report was not generated.' }
+        run: if (Test-Path ${{ env.TEST_RESULTS_DIR }}/Report/Summary.md) { Get-Content ${{ env.TEST_RESULTS_DIR }}/QualityGate/Report/Summary.md | Add-Content $env:GITHUB_STEP_SUMMARY } else { Add-Content $env:GITHUB_STEP_SUMMARY 'Coverage report was not generated.' }
 
       - name: Upload test and coverage reports
         if: always()
