@@ -141,4 +141,81 @@
     <Message Importance="High" Text="============================================================" />
 
   </Target>
+
+  <!--
+    Runs the already-built Microsoft.Testing.Platform executable directly.
+    Use this target when the project-level QualityGate target cannot be invoked
+    in the local environment. It preserves the same configured threshold and
+    validates line, branch, and method coverage from the generated report.
+  -->
+  <Target Name="QualityGateExecutable" DependsOnTargets="Build">
+    <Message Importance="High" Text="============================================================" />
+    <Message Importance="High" Text="libpjsua2maui.mcp Executable Quality Gate (en-US)" />
+    <Message Importance="High" Text="============================================================" />
+
+    <RemoveDir Directories="$(QualityGateResultsDirectory)" />
+    <MakeDir Directories="$(QualityGateResultsDirectory)" />
+
+    <Exec Command="&quot;$(TargetPath)&quot; --report-trx --report-trx-filename test-results.trx --coverlet --coverlet-output-format cobertura"
+          WorkingDirectory="$(QualityGateResultsDirectory)"
+          ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="QualityGateExecutableTestExitCode" />
+    </Exec>
+
+    <Error Condition="'$(QualityGateExecutableTestExitCode)' != '0'"
+           Text="Executable Quality Gate aborted: tests failed with exit code $(QualityGateExecutableTestExitCode)." />
+
+    <Exec Command="dotnet tool run reportgenerator -reports:&quot;$(QualityGateCoveragePattern)&quot; -targetdir:&quot;$(QualityGateReportDirectory)&quot; -reporttypes:&quot;MarkdownSummary;TextSummary&quot; -classfilters:&quot;+libpjsua2maui.mcp*;-Program&quot;"
+          ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="QualityGateExecutableReportGeneratorExitCode" />
+    </Exec>
+
+    <Error Condition="'$(QualityGateExecutableReportGeneratorExitCode)' != '0'"
+           Text="Executable Quality Gate aborted: ReportGenerator failed with exit code $(QualityGateExecutableReportGeneratorExitCode)." />
+    <Error Condition="!Exists('$(QualityGateMarkdownReport)')"
+           Text="Executable Quality Gate aborted: Markdown coverage report was not found at $(QualityGateMarkdownReport)." />
+    <Error Condition="!Exists('$(QualityGateTextReport)')"
+           Text="Executable Quality Gate aborted: text coverage report was not found at $(QualityGateTextReport)." />
+
+    <PropertyGroup>
+      <QualityGateExecutableTextContent>$([System.IO.File]::ReadAllText('$(QualityGateTextReport)'))</QualityGateExecutableTextContent>
+      <QualityGateExecutableLineCoverage>$([System.Text.RegularExpressions.Regex]::Match($(QualityGateExecutableTextContent), '(?im)^\s*Line coverage:\s*([0-9]+(?:\.[0-9]+)?)%').Groups[1].Value)</QualityGateExecutableLineCoverage>
+      <QualityGateExecutableMethodCoverage>$([System.Text.RegularExpressions.Regex]::Match($(QualityGateExecutableTextContent), '(?im)^\s*Method coverage:\s*([0-9]+(?:\.[0-9]+)?)%').Groups[1].Value)</QualityGateExecutableMethodCoverage>
+      <QualityGateExecutableBranchCoverage>$([System.Text.RegularExpressions.Regex]::Match($(QualityGateExecutableTextContent), '(?im)^\s*Branch coverage:\s*([0-9]+(?:\.[0-9]+)?)%').Groups[1].Value)</QualityGateExecutableBranchCoverage>
+      <QualityGateExecutableCoveredBranches>$([System.Text.RegularExpressions.Regex]::Match($(QualityGateExecutableTextContent), '(?im)^\s*Covered branches:\s*([0-9]+)').Groups[1].Value)</QualityGateExecutableCoveredBranches>
+      <QualityGateExecutableTotalBranches>$([System.Text.RegularExpressions.Regex]::Match($(QualityGateExecutableTextContent), '(?im)^\s*Total branches:\s*([0-9]+)').Groups[1].Value)</QualityGateExecutableTotalBranches>
+    </PropertyGroup>
+
+    <Error Condition="'$(QualityGateExecutableLineCoverage)' == '' or '$(QualityGateExecutableMethodCoverage)' == '' or '$(QualityGateExecutableCoveredBranches)' == '' or '$(QualityGateExecutableTotalBranches)' == ''"
+           Text="Executable Quality Gate aborted: unable to extract line, method, or branch coverage data from $(QualityGateTextReport)." />
+
+    <PropertyGroup Condition="'$(QualityGateExecutableBranchCoverage)' == '' and '$(QualityGateExecutableTotalBranches)' == '0'">
+      <QualityGateExecutableBranchCoverage>100</QualityGateExecutableBranchCoverage>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(QualityGateExecutableBranchCoverage)' == '' and '$(QualityGateExecutableTotalBranches)' != '0'">
+      <QualityGateExecutableBranchCoverage>$([System.Math]::Round($([System.Double]::Parse('$(QualityGateExecutableCoveredBranches)')) * 100 / $([System.Double]::Parse('$(QualityGateExecutableTotalBranches)')), 1))</QualityGateExecutableBranchCoverage>
+    </PropertyGroup>
+    <Error Condition="'$(QualityGateExecutableBranchCoverage)' == ''"
+           Text="Executable Quality Gate aborted: unable to calculate branch coverage." />
+
+    <PropertyGroup>
+      <QualityGateExecutableLineFailed Condition="'$(QualityGateExecutableLineCoverage)' &lt; '$(QualityGateThreshold)'">true</QualityGateExecutableLineFailed>
+      <QualityGateExecutableBranchFailed Condition="'$(QualityGateExecutableBranchCoverage)' &lt; '$(QualityGateThreshold)'">true</QualityGateExecutableBranchFailed>
+      <QualityGateExecutableMethodFailed Condition="'$(QualityGateExecutableMethodCoverage)' &lt; '$(QualityGateThreshold)'">true</QualityGateExecutableMethodFailed>
+    </PropertyGroup>
+
+    <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% $(if)" Condition="false" />
+    <Message Importance="High" Text="Line Coverage:    $(QualityGateExecutableLineCoverage)% [$(QualityGateExecutableLineFailed)]" />
+    <Message Importance="High" Text="Branch Coverage:  $(QualityGateExecutableBranchCoverage)% [$(QualityGateExecutableBranchFailed)]" />
+    <Message Importance="High" Text="Method Coverage:  $(QualityGateExecutableMethodCoverage)% [$(QualityGateExecutableMethodFailed)]" />
+    <Message Importance="High" Text="Required:         $(QualityGateThreshold)%" />
+
+    <Error Condition="'$(QualityGateExecutableLineFailed)' == 'true' or '$(QualityGateExecutableBranchFailed)' == 'true' or '$(QualityGateExecutableMethodFailed)' == 'true'"
+           Text="EXECUTABLE QUALITY GATE: FAILED. Required minimum is $(QualityGateThreshold)% for line, branch, and method coverage." />
+
+    <Message Importance="High" Text="EXECUTABLE QUALITY GATE: PASSED" />
+    <Message Importance="High" Text="Reports: $(QualityGateReportDirectory)" />
+    <Message Importance="High" Text="============================================================" />
+  </Target>
+
 </Project>
