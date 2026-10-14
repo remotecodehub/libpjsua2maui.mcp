@@ -22,7 +22,7 @@ PackageKnowledgeExtractor consumes a validated PackageAcquisitionResult and proc
 
 The extractor records public namespaces, types, nested types, interfaces, classes, structs, enums, delegates, methods, constructors, properties, events, fields, parameter names/types, return types, generic arity, documentation IDs, signatures, package version, TFM, and source artifact. Managed presence remains compile-time metadata only and does not imply native platform availability.
 
-XML is parsed with XDocument/XmlReader with DTD processing disabled. Each member's inner XML is preserved, including summary, remarks, parameter and type-parameter entries, returns, values, exceptions, examples, and nested markup. Exact XML documentation IDs are associated only with symbols from the same TFM. Valid documentation without a uniquely matching symbol is retained as unassociated documentation; ambiguous or unsupported signature matches are not guessed. Invalid PE metadata or XML raises a diagnostic identifying the package, version, TFM, and artifact.
+XML is parsed with XDocument/XmlReader with DTD processing disabled. `<summary>` is optional: direct text inside `<member>` is documentation, and `<param>`, `<typeparam>`, `<returns>`, `<value>`, `<remarks>`, `<exception>`, `<example>`, references, and other nested markup are preserved as the member's original inner XML. An empty named member is retained with empty content so its identity is not lost; members without a valid `name` are skipped with no invented ID. Exact XML documentation IDs are associated only with symbols from the same TFM. Valid documentation without a uniquely matching symbol is retained as unassociated documentation; ambiguous or unsupported signature matches are not guessed. Invalid PE metadata or XML raises a diagnostic identifying the package, version, TFM, and artifact.
 
 ## XML documentation validation by TFM
 
@@ -60,6 +60,12 @@ The validation helper should expose enough information to report:
 - the package version being validated.
 
 For the current supported package baseline (`2.17.0.4`), the published package is expected to provide one XML documentation file per supported MAUI TFM under `lib/`.
+
+## Package assets, TFMs, RIDs, and native artifacts
+
+Acquisition discovers artifacts from the package entries rather than from a fixed platform list. Managed assemblies under `lib/<TFM>/` and `runtimes/<RID>/lib/<TFM>/` retain their TFM/RID; `ref/<TFM>/` assemblies are classified separately as reference assemblies. XML documentation beside the package assembly is associated with its `lib` TFM. Files under `runtimes/<RID>/native/` are classified as native libraries only when their native-library extension and native directory context provide that evidence. SWIG/interface and P/Invoke-named files are classified as SWIG artifacts when present, while unknown entries remain `Other`.
+
+The manifest preserves relative package paths, exact package identity/version, and independently optional TFM and RID values. The presence of a managed assembly does not imply a native library or platform support; architectures and platforms remain unknown unless the package path or metadata states them. Discovery is sorted and duplicate-free for a given ZIP, and does not execute or load any package artifact.
 
 ## SWIG/native enrichment
 

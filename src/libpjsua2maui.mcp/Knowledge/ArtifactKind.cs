@@ -6,6 +6,7 @@ namespace libpjsua2maui.mcp.Knowledge;
 public enum ArtifactKind
 {
     ManagedAssembly,
+    ReferenceAssembly,
     XmlDocumentation,
     PackageMetadata,
     SwigArtifact,

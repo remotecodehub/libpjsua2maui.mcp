@@ -36,7 +36,7 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 - [x] Define versioned package knowledge model.
 - [x] Implement acquisition of `libpjsua2maui.nupkg`.
 - [x] Extract assembly metadata and XML documentation.
-- [ ] Detect package assets, TFMs/RIDs and native artifacts.
+- [x] Detect package assets, TFMs/RIDs and native artifacts.
 - [ ] Implement deterministic indexing and persisted/bundled knowledge.
 - [ ] Add provenance to indexed facts.
 

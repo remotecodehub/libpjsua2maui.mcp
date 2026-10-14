@@ -60,6 +60,36 @@ public sealed class PackageAcquirerTests
         await Assert.ThrowsAsync<InvalidDataException>(() => acquirer.AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
     }
 
+    [Fact]
+    public async Task AcquireAsync_RejectsMalformedXmlButAcceptsDocumentationWithoutSummary()
+    {
+        using var directory = new TemporaryDirectory();
+        var handler = new StubHandler(CreatePackageWithXml("<doc><members><member name=\"M:Example.Call\"><returns>Result</returns></member></members></doc>"));
+        var result = await CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken);
+        Assert.True(result.Documentation.IsValid);
+
+        using var malformedDirectory = new TemporaryDirectory();
+        var malformed = new StubHandler(CreatePackageWithXml("<doc><members>"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => CreateAcquirer(malformedDirectory.Path, malformed).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AcquireAsync_DiscoversDeterministicAssetsWithTfmAndRidMetadata()
+    {
+        using var directory = new TemporaryDirectory();
+        var handler = new StubHandler(CreateAssetPackage());
+        var result = await CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken);
+
+        var artifacts = result.Manifest.Artifacts.OrderBy(artifact => artifact.RelativePath, StringComparer.Ordinal).ToArray();
+        Assert.Equal(artifacts.Select(artifact => artifact.RelativePath).Distinct(StringComparer.OrdinalIgnoreCase).Count(), artifacts.Length);
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "lib/net10.0-android/libpjsua2maui.dll" && artifact.Kind == ArtifactKind.ManagedAssembly && artifact.TargetFramework == "net10.0-android" && artifact.RuntimeIdentifier is null);
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "ref/net10.0/libpjsua2maui.dll" && artifact.Kind == ArtifactKind.ReferenceAssembly && artifact.TargetFramework == "net10.0" && artifact.RuntimeIdentifier is null);
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "runtimes/android-arm64/lib/net10.0-android/libpjsua2maui.dll" && artifact.Kind == ArtifactKind.ManagedAssembly && artifact.TargetFramework == "net10.0-android" && artifact.RuntimeIdentifier == "android-arm64");
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "runtimes/android-arm64/native/libpjsua2maui.so" && artifact.Kind == ArtifactKind.NativeLibrary && artifact.TargetFramework is null && artifact.RuntimeIdentifier == "android-arm64");
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "build/swig/libpjsua2maui.i" && artifact.Kind == ArtifactKind.SwigArtifact);
+        Assert.DoesNotContain(artifacts, artifact => artifact.Kind == ArtifactKind.NativeLibrary && artifact.RelativePath.Contains("net10.0-android", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("2.17.0.3")]
     [InlineData("not-a-version")]
@@ -94,6 +124,37 @@ public sealed class PackageAcquirerTests
                     AddEntry(archive, $"lib/{tfm}/libpjsua2maui.xml", "<doc />");
                 }
             }
+        }
+
+        return stream.ToArray();
+    }
+
+    private static byte[] CreateAssetPackage()
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.4</version></metadata></package>");
+            AddEntry(archive, "lib/net10.0-android/libpjsua2maui.dll", "managed");
+            AddEntry(archive, "lib/net10.0-android/libpjsua2maui.xml", "<doc />");
+            AddEntry(archive, "ref/net10.0/libpjsua2maui.dll", "reference");
+            AddEntry(archive, "runtimes/android-arm64/lib/net10.0-android/libpjsua2maui.dll", "managed");
+            AddEntry(archive, "runtimes/android-arm64/native/libpjsua2maui.so", "native");
+            AddEntry(archive, "build/swig/libpjsua2maui.i", "%module example");
+            AddEntry(archive, "README.md", "package notes");
+        }
+
+        return stream.ToArray();
+    }
+
+    private static byte[] CreatePackageWithXml(string xml)
+    {
+        using var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.4</version></metadata></package>");
+            AddEntry(archive, "lib/net10.0-android/libpjsua2maui.dll", "managed");
+            AddEntry(archive, "lib/net10.0-android/libpjsua2maui.xml", xml);
         }
 
         return stream.ToArray();

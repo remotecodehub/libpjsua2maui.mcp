@@ -20,7 +20,9 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         using var archive = new System.IO.Compression.ZipArchive(packageStream, System.IO.Compression.ZipArchiveMode.Read);
         var entries = archive.Entries.ToDictionary(entry => entry.FullName.Replace('\\', '/'), StringComparer.OrdinalIgnoreCase);
 
-        foreach (var assemblyArtifact in acquisition.Manifest.Artifacts.Where(a => a.Kind == ArtifactKind.ManagedAssembly).OrderBy(a => a.TargetFramework, StringComparer.Ordinal))
+        foreach (var assemblyArtifact in acquisition.Manifest.Artifacts
+            .Where(a => a.Kind == ArtifactKind.ManagedAssembly && IsPrimaryLibAssembly(a))
+            .OrderBy(a => a.TargetFramework, StringComparer.Ordinal))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var assemblyEntry = entries[assemblyArtifact.RelativePath];
@@ -75,6 +77,13 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         }
 
         return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated);
+    }
+
+    private static bool IsPrimaryLibAssembly(PackageArtifact artifact)
+    {
+        var parts = artifact.RelativePath.Split('/');
+        return parts.Length == 3 && parts[0].Equals("lib", StringComparison.OrdinalIgnoreCase) &&
+            parts[2].Equals("libpjsua2maui.dll", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<SymbolRepresentation> ReadSymbols(MetadataReader reader, PackageAcquisitionResult acquisition, PackageArtifact artifact)

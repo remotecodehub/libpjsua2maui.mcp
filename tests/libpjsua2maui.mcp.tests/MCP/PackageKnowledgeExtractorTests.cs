@@ -7,6 +7,48 @@ namespace libpjsua2maui.mcp.tests.MCP;
 public sealed class PackageKnowledgeExtractorTests
 {
     [Fact]
+    public async Task ExtractAsync_PreservesMemberContentWithoutSummaryAndAssociatesById()
+    {
+        using var package = CreatePackage("net10.0-android", typeof(PackageVersion).Assembly.Location,
+            """
+            <doc><members>
+              <member name="M:libpjsua2maui.mcp.Knowledge.PackageVersion.Parse(System.String)">
+                Direct member text.
+                <param name="value">The <paramref name="value"/> to parse.</param>
+                <returns>A <see cref="T:libpjsua2maui.mcp.Knowledge.PackageVersion"/>.</returns>
+                <remarks>Additional remarks.</remarks>
+                <exception cref="T:System.ArgumentException">Bad input.</exception>
+                <example><code>PackageVersion.Parse(value)</code></example>
+              </member>
+              <member name="M:libpjsua2maui.mcp.Knowledge.PackageVersion.ToString">
+                <returns>Text.</returns>
+              </member>
+              <member name="M:libpjsua2maui.mcp.Knowledge.PackageVersion.CompareTo(libpjsua2maui.mcp.Knowledge.PackageVersion)">
+                <summary>With summary.</summary><returns>Comparison.</returns>
+              </member>
+              <member name="M:empty.Member">   </member>
+              <member name="M:missing.Member"><returns>Unassociated.</returns></member>
+            </members></doc>
+            """);
+
+        var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+
+        var parsed = Assert.Single(result.Associations, association => association.Documentation.MemberId.EndsWith("PackageVersion.Parse(System.String)", StringComparison.Ordinal));
+        Assert.Contains("Direct member text.", parsed.Documentation.Content);
+        Assert.Contains("<param", parsed.Documentation.Content);
+        Assert.Contains("<paramref", parsed.Documentation.Content);
+        Assert.Contains("<returns>", parsed.Documentation.Content);
+        Assert.Contains("<remarks>", parsed.Documentation.Content);
+        Assert.Contains("<exception", parsed.Documentation.Content);
+        Assert.Contains("<example>", parsed.Documentation.Content);
+
+        var returnsOnly = Assert.Single(result.Documentation, documentation => documentation.MemberId.EndsWith("PackageVersion.ToString", StringComparison.Ordinal));
+        Assert.Contains("<returns>", returnsOnly.Content);
+        Assert.Contains(result.Documentation, documentation => documentation.MemberId == "M:empty.Member" && string.IsNullOrEmpty(documentation.Content));
+        Assert.Contains(result.UnassociatedDocumentation, documentation => documentation.MemberId == "M:missing.Member");
+    }
+
+    [Fact]
     public async Task ExtractAsync_ReadsPublicMetadataAndPreservesStructuredXmlPerTfm()
     {
         using var package = CreatePackage("net10.0-android", typeof(PackageVersion).Assembly.Location,
