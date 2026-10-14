@@ -276,7 +276,8 @@ jobs:
             Add-Content -Path $summaryFile -Value "`n<details><summary>Coverage report (text)</summary>`n"
             Add-Content -Path $summaryFile -Value "`n```text"
             Get-Content -Path $textReport | Add-Content -Path $summaryFile
-            Add-Content -Path $summaryFile -Value "````n</details>`n"
+            Add-Content -Path $summaryFile -Value '```'
+            Add-Content -Path $summaryFile -Value '</details>'
           }
 
       - name: Upload test and coverage reports
