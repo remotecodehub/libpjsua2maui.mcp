@@ -12,7 +12,7 @@
   <!-- Quality Gate -->
   <PropertyGroup>
     <QualityGateThreshold>90</QualityGateThreshold>
-    <QualityGateResultsDirectory>$(MSBuildProjectDirectory)/TestResults/QualityGate</QualityGateResultsDirectory>
+    <QualityGateResultsDirectory>$(MSBuildProjectDirectory)/TestResults/</QualityGateResultsDirectory>
     <QualityGateReportDirectory>$(QualityGateResultsDirectory)/Report</QualityGateReportDirectory>
     <QualityGateMarkdownReport>$(QualityGateReportDirectory)/Summary.md</QualityGateMarkdownReport>
     <QualityGateTextReport>$(QualityGateReportDirectory)/Summary.txt</QualityGateTextReport>

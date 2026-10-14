@@ -49,14 +49,10 @@ jobs:
       - name: Test
         id: test
         shell: pwsh
-        working-directory: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/
         continue-on-error: true
-        env:
-          TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
         run: |
           $ErrorActionPreference = 'Stop'
           $resultsDir = $env:TEST_RESULTS_DIR
-          $testAssembly = Join-Path $env:GITHUB_WORKSPACE 'tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.dll'
           New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
 
           # Remove stale outputs so this run cannot accidentally consume artifacts from a previous run.
@@ -64,14 +60,10 @@ jobs:
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path (Join-Path $resultsDir 'QualityGate') | Out-Null
 
-          if (-not (Test-Path $testAssembly)) {
-            throw "Test assembly was not built: $testAssembly"
-          }
-
           $outputFile = Join-Path $resultsDir 'test-output.txt'
           $trxFile = Join-Path $resultsDir 'test-results.trx'
           $testArguments = @(
-            $testAssembly,
+            ${{ env.SOLUTION }},
             '--report-trx',
             '--report-trx-filename', 'test-results.trx',
             '--results-directory', $resultsDir,
@@ -109,14 +101,7 @@ jobs:
         shell: pwsh
         env:
           TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
-        run: |
-          if (Test-Path $env:TEST_RESULTS_DIR) {
-            Get-ChildItem -Path $env:TEST_RESULTS_DIR -Recurse -File |
-              Select-Object FullName, Length |
-              Format-Table -AutoSize
-          } else {
-            Write-Warning "Test results directory does not exist: $env:TEST_RESULTS_DIR"
-          }
+        run: Get-ChildItem -Path $env:TEST_RESULTS_DIR -Recurse -File 
 
       - name: Publish Test Summary
         uses: dorny/test-reporter@v3
