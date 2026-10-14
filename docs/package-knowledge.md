@@ -99,6 +99,20 @@ Every enriched fact should carry enough provenance to reproduce the decision: pa
 
 Indexing should be deterministic and repeatable. A package version must produce the same logical model from the same inputs. Do not mutate an existing version's model silently; create a new version or invalidate/rebuild it explicitly.
 
+## Deterministic indexing and persistence
+
+`KnowledgeIndexer` is the Core boundary between `PackageKnowledgeExtractor` and knowledge consumers. It consumes a validated `PackageExtractionResult`; it does not acquire, reopen, or reparse the package. The result is an immutable `IndexedKnowledgeSet` with an `Indexed` manifest status and retains the manifest, artifacts, symbols, complete documentation, associations, and unassociated documentation.
+
+Artifacts, symbols, documentation, and associations are ordered with ordinal, explicit keys. TFM, RID, documentation ID, signature, and relative artifact path participate in those keys, so overloads and platform-specific observations remain distinct. Equivalent duplicate observations are collapsed; conflicting records with one logical identity fail indexing rather than being selected by encounter order.
+
+The canonical offline format is compact UTF-8 JSON written by `JsonKnowledgeStore`. Its schema version is currently **1**, independent of the NuGet package version and the optional knowledge-set revision. The loader rejects unsupported schemas, invalid enum values, missing references, invalid relative artifact paths, and incomplete manifests before returning a set. JSON contains only normalized package-relative paths; acquisition paths and timestamps are not persisted. Save writes a temporary file in the destination directory and promotes it after the complete write, cleaning up after failures where possible.
+
+Loading an existing artifact is offline and has no dependency on `IPackageAcquirer` or `IPackageKnowledgeExtractor`. A setup/update operation may explicitly acquire and extract a package, then call `KnowledgeIndexer` and `JsonKnowledgeStore.SaveAsync` to generate or replace the bundled artifact. Hosts can ship that generated JSON as application content and call `LoadAsync` during startup or query setup. No fabricated baseline artifact is committed by this repository; generation must use a validated acquisition/extraction pipeline for the exact requested package version.
+
+Documentation content is persisted as the complete XML inner content represented by `DocumentationRecord`. A `<summary>` element is not required. Empty named records and valid records without a unique symbol association remain in the documentation or unassociated collections.
+
+The current persistence model carries the existing relationship shape for future indexed relationship data, but this check does not add or infer provenance. Managed-to-native evidence remains part of the separate provenance roadmap check.
+
 ## Offline mode
 
 The stdio host must support a pre-indexed package knowledge set so normal agent queries do not require Internet access. Acquisition may be a separate setup/update operation. The HTTP image may ship a known version or build its index during image creation; runtime network access should not be required for ordinary queries.
