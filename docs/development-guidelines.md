@@ -37,15 +37,19 @@ Core query and parsing behavior must be unit tested. Include version/platform ca
 
 ### Mandatory coverage quality gate
 
-Before running tests that depend on repository-local .NET tools, run `dotnet tool restore` from the repository root. The mandatory quality-gate command, also executed from the repository root, is:
+Before invoking repository-local .NET tools, run `dotnet tool restore` from the repository root. First try the canonical target:
 
 ```powershell
 dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
 ```
 
-The test project's custom `QualityGate` target is the authoritative validation command. It executes tests, collects coverage, creates text/Markdown reports, and enforces a minimum of 90% for lines, branches, and methods. Each coverage dimension below 90% must produce its own warning, and any missed threshold must fail the target. Review the generated report and include the actual percentages and command result in implementation summaries. Do not lower the threshold, exclude relevant production code, or substitute plain `dotnet test` for the gate.
+If an environment/MSBuild problem prevents invoking this target, retain it unchanged and use the supplemental executable-based path:
+- Resolve the generated test executable path from the build output and run `dotnet test <path-to-test-executable>` to verify tests and Cobertura XML generation.
+- Run `dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGateExecutable` to generate `Summary.txt` and `Summary.md` and validate line, branch, and method coverage.
 
-If execution is blocked by an environment/tooling limitation, report the exact command and diagnostic to the user and pause the implementation workflow until the user adjusts the target and signals that work may resume. Do not delete or replace the existing `QualityGate` target. If necessary, an additional target may be added to parse the existing Coverlet/ReportGenerator text report for method coverage, but it must preserve the existing target and its rules.
+Both targets use the configured threshold (90% by default). The supplemental target must fail if tests fail, coverage reports are missing/unparseable, or any coverage dimension is below threshold. Report exact commands, exit statuses, actual percentages, and report locations. Do not lower the threshold, exclude relevant production code, or treat a direct test run as a passing gate.
+
+If execution is blocked by environment/tooling limitations, report the exact command and complete relevant diagnostic to the user and pause until the user adjusts the target and signals that implementation may resume.
 
 ## Dependencies
 
