@@ -16,6 +16,14 @@ The published `libpjsua2maui.nupkg` is the consumer contract. Index it by exact 
 
 `PackageAcquirer` performs the explicit setup/update operation against the NuGet v3 flat-container source. By default, callers should provide an absolute storage directory; artifacts are stored at `<storage>/libpjsua2maui/<version>/libpjsua2maui.<version>.nupkg`. An existing file is revalidated and reused. Downloads are written to a unique temporary file and promoted only after ZIP/package and per-TFM XML validation succeeds. Normal knowledge queries do not invoke acquisition or require network access.
 
+## Assembly and XML extraction
+
+PackageKnowledgeExtractor consumes a validated PackageAcquisitionResult and processes each managed assembly and XML artifact independently by TFM. Assemblies are read from the package ZIP with PEReader and MetadataReader; they are never loaded for execution, so extraction does not require MAUI runtimes or native pjproject binaries.
+
+The extractor records public namespaces, types, nested types, interfaces, classes, structs, enums, delegates, methods, constructors, properties, events, fields, parameter names/types, return types, generic arity, documentation IDs, signatures, package version, TFM, and source artifact. Managed presence remains compile-time metadata only and does not imply native platform availability.
+
+XML is parsed with XDocument/XmlReader with DTD processing disabled. Each member's inner XML is preserved, including summary, remarks, parameter and type-parameter entries, returns, values, exceptions, examples, and nested markup. Exact XML documentation IDs are associated only with symbols from the same TFM. Valid documentation without a uniquely matching symbol is retained as unassociated documentation; ambiguous or unsupported signature matches are not guessed. Invalid PE metadata or XML raises a diagnostic identifying the package, version, TFM, and artifact.
+
 ## XML documentation validation by TFM
 
 During NuGet package acquisition and indexing, the ingestion process must validate that XML documentation is present for **each TFM represented under the package's `lib/` directory**.

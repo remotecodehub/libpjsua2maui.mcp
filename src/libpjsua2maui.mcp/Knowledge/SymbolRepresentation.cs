@@ -10,13 +10,21 @@ public sealed record SymbolRepresentation
         PackageVersion packageVersion,
         SymbolIdentity identity,
         string? targetFramework = null,
-        PackageArtifact? sourceArtifact = null)
+        PackageArtifact? sourceArtifact = null,
+        string? documentationId = null,
+        string? signature = null,
+        IReadOnlyList<SymbolParameter>? parameters = null,
+        string? returnType = null)
     {
         Package = package ?? throw new ArgumentNullException(nameof(package));
         PackageVersion = packageVersion ?? throw new ArgumentNullException(nameof(packageVersion));
         Identity = identity ?? throw new ArgumentNullException(nameof(identity));
         TargetFramework = string.IsNullOrWhiteSpace(targetFramework) ? null : targetFramework;
         SourceArtifact = sourceArtifact;
+        DocumentationId = string.IsNullOrWhiteSpace(documentationId) ? null : documentationId;
+        Signature = string.IsNullOrWhiteSpace(signature) ? null : signature;
+        Parameters = Array.AsReadOnly((parameters ?? []).ToArray());
+        ReturnType = string.IsNullOrWhiteSpace(returnType) ? null : returnType;
 
         if (sourceArtifact is not null &&
             (sourceArtifact.Package != package || sourceArtifact.PackageVersion != packageVersion))
@@ -34,4 +42,12 @@ public sealed record SymbolRepresentation
     public string? TargetFramework { get; }
 
     public PackageArtifact? SourceArtifact { get; }
+
+    public string? DocumentationId { get; }
+
+    public string? Signature { get; }
+
+    public IReadOnlyList<SymbolParameter> Parameters { get; }
+
+    public string? ReturnType { get; }
 }
