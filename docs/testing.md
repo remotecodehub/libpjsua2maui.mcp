@@ -59,6 +59,26 @@ Keep small representative package/API fixtures in the `MCP/TestSupport/Fixtures`
 
 Use mocks, fakes, and stubs only when they isolate a meaningful boundary. Prefer small fakes for deterministic domain behavior and mocks for interaction verification. Keep test doubles local to the test area whose boundary they represent.
 
+## Mandatory QualityGate
+
+Run all commands from the repository root. First restore the repository-local .NET tools (including ReportGenerator):
+
+```powershell
+dotnet tool restore
+```
+
+Then run the test project's custom target:
+
+```powershell
+dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
+```
+
+The `QualityGate` target executes the tests and creates coverage reports under `tests/libpjsua2maui.mcp.tests/TestResults/QualityGate/Report`. The required minimum is 90% for line, branch, and method coverage. The target emits one warning for each coverage dimension below 90% and fails if any dimension is below the threshold. The generated `Summary.txt` and `Summary.md` are the evidence for the reported percentages.
+
+A successful ordinary build or `dotnet test` is not a substitute for this target. Do not reduce the threshold or exclude relevant production code to make the gate pass. Report the exact command result and actual percentages for all three dimensions.
+
+If the command cannot execute because of an environment/tooling restriction, stop and notify the user with the exact command and relevant error. Wait for the user to adjust the target and signal that the agent may resume. If an additional target is a more practical solution, it may be added to parse method coverage from the existing Coverlet/ReportGenerator text report, but the existing `QualityGate` target must remain intact.
+
 ## Validation gates
 
-A roadmap phase is complete only when the relevant tests pass, the solution builds, and documentation accurately describes the resulting behavior.
+A roadmap phase is complete only when the relevant tests pass, the solution builds, the mandatory `QualityGate` passes, and documentation accurately describes the resulting behavior.
