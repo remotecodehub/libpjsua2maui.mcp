@@ -165,7 +165,7 @@ jobs:
         if: always()
         shell: pwsh
         env:
-          TEST_RESULTS_DIR: \${{ env.TEST_RESULTS_DIR }}
+          TEST_RESULTS_DIR: ${{ env.TEST_RESULTS_DIR }}
           QUALITY_GRADE_THRESHOLD: 90
         run: |
           $ErrorActionPreference = 'Stop'
@@ -241,7 +241,7 @@ jobs:
 
           if ($failed) {
             $summaryText = $failures -join ' '
-            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "\`n**Quality Gate: FAILED** — $summaryText"
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "**Quality Gate: FAILED** — $summaryText"
             Write-Error "Quality Gate failed: $summaryText"
             exit 1
           }
