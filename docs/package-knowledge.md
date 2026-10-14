@@ -12,6 +12,10 @@ The Core knowledge model represents this package identity and minimum version ex
 
 The published `libpjsua2maui.nupkg` is the consumer contract. Index it by exact version. The indexer should inspect assembly metadata and XML documentation first, then enrich it with package-contained generated artifacts where available.
 
+## Acquisition
+
+`PackageAcquirer` performs the explicit setup/update operation against the NuGet v3 flat-container source. By default, callers should provide an absolute storage directory; artifacts are stored at `<storage>/libpjsua2maui/<version>/libpjsua2maui.<version>.nupkg`. An existing file is revalidated and reused. Downloads are written to a unique temporary file and promoted only after ZIP/package and per-TFM XML validation succeeds. Normal knowledge queries do not invoke acquisition or require network access.
+
 ## XML documentation validation by TFM
 
 During NuGet package acquisition and indexing, the ingestion process must validate that XML documentation is present for **each TFM represented under the package's `lib/` directory**.
