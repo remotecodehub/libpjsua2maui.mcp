@@ -16,6 +16,7 @@ public sealed class SourceInspection
     private static readonly Regex PjQualifiedCallPattern = new(@"pj::(?<type>[A-Za-z_][A-Za-z0-9_]*)::(?<method>[A-Za-z_][A-Za-z0-9_]*)\s*\(", RegexOptions.Compiled);
     private static readonly Regex PjVariablePattern = new(@"\bpj::(?<type>[A-Za-z_][A-Za-z0-9_]*)\s*(?:\*|&)\s*(?<variable>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
     private static readonly Regex AnyNativeVariablePattern = new(@"\b(?:pj|std)::[^;\r\n]*[&*]\s*(?<variable>arg[0-9]+)\b", RegexOptions.Compiled);
+    private static readonly Regex ManagedMemberPattern = new(@"\b(?:public|protected|private|internal)\s+(?:(?:static|virtual|override|sealed|async|extern|unsafe)\s+)*(?:(?<return>[A-Za-z_][A-Za-z0-9_<>,.?\[\]:]*)\s+)?(?<name>[A-Za-z_][A-Za-z0-9_]*(?:<[^>]+>)?)\s*\((?<parameters>[^)]*)\)", RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>Returns facts supported by one published source artifact.</summary>
     public SourceInspectionResult Inspect(PackageAcquisitionResult acquisition, PackageArtifact artifact, string content)
@@ -91,17 +92,17 @@ public sealed class SourceInspection
 
         var results = new List<KnowledgeRelationship>();
         var diagnostics = new List<SourceInspectionDiagnostic>();
-        var managedSources = packageSources.Where(item => item.Key.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) && item.Key.Contains("/pjsua2/", StringComparison.OrdinalIgnoreCase)).OrderBy(item => item.Key, StringComparer.Ordinal);
+        var managedSources = packageSources.Where(item => item.Key.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) && item.Key.Contains("/pjsua2/", StringComparison.OrdinalIgnoreCase) && !item.Key.EndsWith("pjsua2PINVOKE.cs", StringComparison.OrdinalIgnoreCase)).OrderBy(item => item.Key, StringComparer.Ordinal).ToArray();
         var pinvoke = packageSources.Where(item => item.Key.EndsWith("pjsua2PINVOKE.cs", StringComparison.OrdinalIgnoreCase)).SelectMany(item => ParsePInvokes(item.Key, item.Value)).OrderBy(item => item.Path, StringComparer.Ordinal).ThenBy(item => item.Method, StringComparer.Ordinal).ToArray();
-        var wrappers = packageSources.Where(item => item.Key.EndsWith("pjsua2_wrap.cpp", StringComparison.OrdinalIgnoreCase)).SelectMany(item => ParseCppDefinitions(item.Key, item.Value)).ToDictionary(item => item.EntryPoint, StringComparer.Ordinal);
+        var wrappers = packageSources.Where(item => item.Key.EndsWith("pjsua2_wrap.cpp", StringComparison.OrdinalIgnoreCase)).SelectMany(item => ParseCppDefinitions(item.Key, item.Value)).OrderBy(item => item.Path, StringComparer.Ordinal).ThenBy(item => item.EntryPoint, StringComparer.Ordinal).ToArray();
         var coverage = new SourceInspectionCoverage
         {
             ManagedTypesDiscovered = managedSources.Sum(item => CSharpTypePattern.Matches(item.Value).Count),
             ManagedMembersDiscovered = managedSources.Sum(item => CountManagedMembers(item.Value)),
             SwigCallsDiscovered = managedSources.Sum(item => PInvokeCallPattern.Matches(item.Value).Count),
             PInvokeDeclarationsDiscovered = pinvoke.Select(item => $"{item.Path}|{item.Method}|{item.EntryPoint}").Distinct(StringComparer.Ordinal).Count(),
-            PInvokeDeclarationsResolvedToWrapper = pinvoke.Count(item => wrappers.ContainsKey(item.EntryPoint)),
-            WrapperDefinitionsDiscovered = wrappers.Count
+            PInvokeDeclarationsResolvedToWrapper = pinvoke.Count(item => wrappers.Count(wrapper => wrapper.EntryPoint.Equals(item.EntryPoint, StringComparison.Ordinal) && SamePlatform(wrapper.Path, item.Path)) == 1),
+            WrapperDefinitionsDiscovered = wrappers.Select(item => $"{item.Path}|{item.EntryPoint}").Distinct(StringComparer.Ordinal).Count()
         };
         var membersWithCalls = new HashSet<string>(StringComparer.Ordinal);
         var resolvedSwigCalls = 0;
@@ -111,12 +112,12 @@ public sealed class SourceInspection
             var typeName = Path.GetFileNameWithoutExtension(managed.Key);
             foreach (Match call in PInvokeCallPattern.Matches(managed.Value))
             {
-                var method = FindManagedMember(managed.Value, call.Index, typeName);
+                var member = FindManagedMember(managed.Value, call.Index, typeName);
                 var callName = call.Groups["call"].Value;
-                membersWithCalls.Add($"{managed.Key}::{method}");
-                var managedNode = Node(KnowledgeNodeKind.ManagedSymbol, $"managed:{managed.Key}::{method}");
+                membersWithCalls.Add($"{managed.Key}::{member.Identity}");
+                var managedNode = Node(KnowledgeNodeKind.ManagedSymbol, $"managed:{managed.Key}::{member.Identity}");
                 var swigNode = Node(KnowledgeNodeKind.SwigSymbol, $"swig:{managed.Key}::{callName}");
-                var memberDelimited = !method.Equals(typeName, StringComparison.Ordinal) || HasConstructorBefore(managed.Value, call.Index, typeName);
+                var memberDelimited = member.IsDelimited;
                 if (!memberDelimited)
                 {
                     diagnostics.Add(new SourceInspectionDiagnostic(managed.Key, "managed member containing P/Invoke call", $"The direct pjsua2PINVOKE.{callName} call was found, but the enclosing managed member could not be delimited by the current source parser.", SourceInspectionDiagnosticKind.Unparsed));
@@ -145,24 +146,35 @@ public sealed class SourceInspection
                 var pinvokeNode = Node(KnowledgeNodeKind.SwigSymbol, $"pinvoke:{declaration.Path}::{declaration.Method}::{declaration.EntryPoint}");
                 results.Add(Relationship(acquisition, "swig-call-to-pinvoke", swigNode, pinvokeNode, KnowledgeFactStatus.Established, PackageSourceProvenance(acquisition, declaration.Path, $"DllImport library '{declaration.Library}' EntryPoint '{declaration.EntryPoint}' declares pjsua2PINVOKE.{declaration.Method}."), KnowledgeConfidence.Confirmed));
 
-                if (!wrappers.TryGetValue(declaration.EntryPoint, out var wrapper))
+                var wrapperCandidates = wrappers.Where(item => item.EntryPoint.Equals(declaration.EntryPoint, StringComparison.Ordinal) && SamePlatform(item.Path, declaration.Path)).ToArray();
+                if (wrapperCandidates.Length == 0)
                 {
                     results.Add(Relationship(acquisition, "pinvoke-to-native-wrapper", pinvokeNode, Unknown(KnowledgeNodeKind.WrapperSymbol), KnowledgeFactStatus.Unknown, PackageSourceProvenance(acquisition, declaration.Path, $"No generated wrapper definition was found for EntryPoint '{declaration.EntryPoint}'."), KnowledgeConfidence.Strong));
                     continue;
                 }
 
+                if (wrapperCandidates.Length > 1)
+                {
+                    results.Add(Relationship(acquisition, "pinvoke-to-native-wrapper", pinvokeNode, Unknown(KnowledgeNodeKind.WrapperSymbol), KnowledgeFactStatus.Conflicting, RepositoryProvenance(acquisition, repository, declaration.Path, managed.Key, $"Multiple platform-local wrapper definitions were found for EntryPoint '{declaration.EntryPoint}'."), KnowledgeConfidence.Strong));
+                    continue;
+                }
+
+                var wrapper = wrapperCandidates[0];
                 var wrapperNode = Node(KnowledgeNodeKind.WrapperSymbol, $"wrapper:{wrapper.Path}::{wrapper.EntryPoint}");
                 results.Add(Relationship(acquisition, "pinvoke-to-native-wrapper", pinvokeNode, wrapperNode, KnowledgeFactStatus.Established, RepositoryProvenance(acquisition, repository, wrapper.Path, managed.Key, "The exact P/Invoke entry point has a matching generated C++ definition."), KnowledgeConfidence.Confirmed));
                 AddPjprojectMappings(acquisition, repository, wrapper, wrapperNode, results, diagnostics, ref coverage);
             }
         }
 
-        var applicableManagedMembers = managedSources.Sum(item => CountApplicableManagedMembers(item.Value));
+        var memberClassification = managedSources.Select(item => ClassifyManagedMembers(item.Key, item.Value)).Aggregate(new ManagedMemberClassification(), (total, current) => total.Add(current));
         return new RepositoryMappingInspectionResult(results, coverage with
         {
-            ManagedMembersApplicableToSwig = applicableManagedMembers,
+            ManagedMembersApplicableToSwig = memberClassification.Applicable,
             ManagedMembersWithSwigCalls = membersWithCalls.Count,
-            ManagedMembersWithoutDirectSwigCall = Math.Max(0, applicableManagedMembers - membersWithCalls.Count),
+            ManagedMembersWithoutDirectSwigCall = Math.Max(0, memberClassification.Applicable - membersWithCalls.Count),
+            ManagedMembersNotApplicable = memberClassification.NotApplicable,
+            ManagedMembersApplicabilityUnknown = memberClassification.Unknown,
+            ManagedMembersUnparsed = memberClassification.Unparsed,
             SwigCallsResolvedToPInvoke = resolvedSwigCalls
         }, diagnostics);
     }
@@ -267,13 +279,19 @@ public sealed class SourceInspection
     private static KnowledgeNodeReference Unknown(KnowledgeNodeKind kind) => new(kind, KnowledgeNodeResolution.Unknown, null);
     private static KnowledgeRelationship Relationship(PackageAcquisitionResult acquisition, string type, KnowledgeNodeReference source, KnowledgeNodeReference target, KnowledgeFactStatus status, FactProvenance provenance, KnowledgeConfidence confidence) => new(acquisition.Manifest.Identity, type, source, target, status, provenance, confidence);
 
-    private static string FindManagedMember(string content, int position, string typeName)
+    private static ManagedMemberMatch FindManagedMember(string content, int position, string typeName)
     {
         var prefix = content[..position];
-        var matches = Regex.Matches(prefix, "(?:public|protected|private|internal|static|virtual|override|sealed|async|\\s)+[A-Za-z_][A-Za-z0-9_<>,.?\\[\\]]*\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
-        var constructorMatches = Regex.Matches(prefix, $"(?:public|protected|private|internal)\\s+{Regex.Escape(typeName)}\\s*\\(");
-        var candidates = matches.Cast<Match>().Concat(constructorMatches.Cast<Match>()).OrderBy(match => match.Index).ToArray();
-        return candidates.Length == 0 ? typeName : candidates[^1].Groups["name"].Success ? candidates[^1].Groups["name"].Value : typeName;
+        var match = ManagedMemberPattern.Matches(prefix).Cast<Match>().OrderBy(item => item.Index).LastOrDefault();
+        if (match is null)
+        {
+            return new ManagedMemberMatch($"{typeName}.<unparsed>", false);
+        }
+
+        var name = match.Groups["name"].Value;
+        var memberName = name.Equals(typeName, StringComparison.Ordinal) ? "#ctor" : name;
+        var parameters = NormalizeParameters(match.Groups["parameters"].Value);
+        return new ManagedMemberMatch($"{typeName}.{memberName}({parameters})", true);
     }
 
     private static int CountManagedMembers(string content)
@@ -383,14 +401,26 @@ public sealed class SourceInspection
     }
     private static string Relative(string root, string path) => Path.GetRelativePath(root, path).Replace('\\', '/');
 
-    private static int CountApplicableManagedMembers(string content)
+    private static ManagedMemberClassification ClassifyManagedMembers(string path, string content)
     {
-        return CountManagedMembers(content);
+        var count = CountManagedMembers(content);
+        if (count == 0)
+        {
+            return new ManagedMemberClassification { Unparsed = content.Contains("public", StringComparison.Ordinal) ? 1 : 0 };
+        }
+
+        var fileName = Path.GetFileNameWithoutExtension(path);
+        if (fileName.Equals("pjsua2PINVOKE", StringComparison.OrdinalIgnoreCase) || fileName.StartsWith("SWIGTYPE_", StringComparison.Ordinal))
+        {
+            return new ManagedMemberClassification { NotApplicable = count };
+        }
+
+        return new ManagedMemberClassification { Applicable = count };
     }
 
-    private static bool HasConstructorBefore(string content, int position, string typeName)
+    private static string NormalizeParameters(string parameters)
     {
-        return Regex.IsMatch(content[..position], $"(?:public|protected|private|internal)\\s+{Regex.Escape(typeName)}\\s*\\(", RegexOptions.CultureInvariant);
+        return string.Join(",", parameters.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(parameter => Regex.Replace(parameter, @"\s+", " ")));
     }
 
     private static bool SamePlatform(string managedPath, string pinvokePath)
@@ -403,6 +433,23 @@ public sealed class SourceInspection
         var parts = path.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
         var index = Array.FindIndex(parts, item => item.Equals("Platforms", StringComparison.OrdinalIgnoreCase));
         return index >= 0 && index + 1 < parts.Length ? parts[index + 1] : string.Empty;
+    }
+
+    private sealed record ManagedMemberMatch(string Identity, bool IsDelimited);
+    private sealed record ManagedMemberClassification
+    {
+        public int Applicable { get; init; }
+        public int NotApplicable { get; init; }
+        public int Unknown { get; init; }
+        public int Unparsed { get; init; }
+
+        public ManagedMemberClassification Add(ManagedMemberClassification other) => this with
+        {
+            Applicable = Applicable + other.Applicable,
+            NotApplicable = NotApplicable + other.NotApplicable,
+            Unknown = Unknown + other.Unknown,
+            Unparsed = Unparsed + other.Unparsed
+        };
     }
 
     private sealed record PInvokeDeclaration(string Path, string Library, string Method, string EntryPoint);

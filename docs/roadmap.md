@@ -44,7 +44,7 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ### Phase 2A — Evidence universe and exhaustive inventory
 
-Phase 2A is complete. The deterministic inventory model, metadata classification, TFM evidence deduplication, XML/source correlation, counters, and focused tests passed the manual validation procedure outside the sandbox. Phase 2B is implemented locally and awaits the user's manual CI validation; Phase 2C--2E remain pending.
+Phase 2A is complete. The deterministic inventory model, metadata classification, TFM evidence deduplication, XML/source correlation, counters, and focused tests passed the manual validation procedure outside the sandbox. Metadata enumeration is now explicitly proven when all primary managed assemblies are inspected; source/XML correlation remains a separate evidence dimension. Phase 2B is implemented locally and awaits the user's manual CI validation; Phase 2C--2E remain pending.
 
 - [x] Inspect generated SWIG artifacts available from the package/repository. Baseline `2.17.0.5` publishes generated C#, C++ and headers; the producer tag and pjproject gitlink are recorded separately.
 - [x] Establish the complete deterministic package symbol universe and immutable denominators for all relevant types and members.

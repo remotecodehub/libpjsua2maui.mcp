@@ -129,16 +129,19 @@ public sealed record InventoryCounters
     public int CompleteTfmEvidenceItems { get; init; }
 }
 
-public sealed record InventoryCompletenessReport(InventoryCounters Counters)
+public sealed record InventoryCompletenessReport(InventoryCounters Counters, MetadataEnumerationCoverage? MetadataEnumeration = null)
 {
-    public bool InventoryComplete => Counters.TotalTypes == Counters.TypesInspected && Counters.TotalMembers == Counters.MembersInspected;
+    public bool InspectionComplete => Counters.TotalTypes == Counters.TypesInspected && Counters.TotalMembers == Counters.MembersInspected;
+    public bool InventoryComplete => InspectionComplete && DiscoveryDenominatorProven;
     public decimal TypeInspectionPercentage => Percentage(Counters.TypesInspected, Counters.TotalTypes);
     public decimal MemberInspectionPercentage => Percentage(Counters.MembersInspected, Counters.TotalMembers);
     public decimal? SourceEvidenceCoveragePercentage => EvidencePercentage(Counters.SourceEvidenceItems, Counters.TotalTfmEvidence);
     public decimal? XmlDocumentationCoveragePercentage => EvidencePercentage(Counters.XmlEvidenceItems, Counters.TotalTfmEvidence);
     public decimal? TfmEvidenceCompletenessPercentage => EvidencePercentage(Counters.CompleteTfmEvidenceItems, Counters.TotalTfmEvidence);
-    public bool DiscoveryDenominatorProven => false;
-    public decimal? DiscoveryCompletenessPercentage => null;
+    public bool DiscoveryDenominatorProven => MetadataEnumeration?.IsComplete == true;
+    public decimal? DiscoveryCompletenessPercentage => MetadataEnumeration is null
+        ? null
+        : Percentage(MetadataEnumeration.InspectedManagedAssemblies, MetadataEnumeration.ExpectedManagedAssemblies);
 
     public string ToText(PackageIdentity? package, PackageVersion? packageVersion, IReadOnlyList<string> targetFrameworks)
     {
@@ -154,12 +157,12 @@ public sealed record InventoryCompletenessReport(InventoryCounters Counters)
             $"Members without source: {Counters.MembersWithoutSource}",
             $"Types without XML documentation: {Counters.TypesWithoutXmlDocumentation}",
             $"Members without XML documentation: {Counters.MembersWithoutXmlDocumentation}",
-            $"Discovery completeness: not provable without an independent expected-universe denominator",
+            $"Discovery completeness: {(DiscoveryDenominatorProven ? $"{FormatPercentage(DiscoveryCompletenessPercentage)} metadata assemblies enumerated" : "not provable without complete assembly-enumeration evidence")}",
             $"Inspection coverage: {TypeInspectionPercentage:0.##}% types; {MemberInspectionPercentage:0.##}% members",
             $"Source evidence coverage: {FormatPercentage(SourceEvidenceCoveragePercentage)}",
             $"XML documentation coverage: {FormatPercentage(XmlDocumentationCoveragePercentage)}",
             $"TFM evidence completeness: {FormatPercentage(TfmEvidenceCompletenessPercentage)}",
-            $"Inventory completeness: types {TypeInspectionPercentage:0.##}%; members {MemberInspectionPercentage:0.##}%");
+            $"Inventory completeness: {(InventoryComplete ? "complete" : "not complete")}; inspection types {TypeInspectionPercentage:0.##}%; members {MemberInspectionPercentage:0.##}%");
     }
 
     private static decimal Percentage(int numerator, int denominator) => denominator == 0 ? 100m : numerator * 100m / denominator;
@@ -169,14 +172,15 @@ public sealed record InventoryCompletenessReport(InventoryCounters Counters)
 
 public sealed record PackageSymbolInventory
 {
-    public PackageSymbolInventory(IReadOnlyList<PackageInventoryItem> items)
+    public PackageSymbolInventory(IReadOnlyList<PackageInventoryItem> items, MetadataEnumerationCoverage? metadataEnumeration = null)
     {
         Items = Array.AsReadOnly((items ?? []).OrderBy(item => item.Identity, StringComparer.Ordinal).ToArray());
         Package = Items.FirstOrDefault()?.Package;
         PackageVersion = Items.FirstOrDefault()?.PackageVersion;
         TargetFrameworks = Items.SelectMany(item => item.Evidence).Select(evidence => evidence.TargetFramework).Where(value => value is not null).Select(value => value!).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         Counters = CalculateCounters(Items);
-        Completeness = new InventoryCompletenessReport(Counters);
+        MetadataEnumeration = metadataEnumeration;
+        Completeness = new InventoryCompletenessReport(Counters, metadataEnumeration);
     }
 
     public IReadOnlyList<PackageInventoryItem> Items { get; }
@@ -185,6 +189,7 @@ public sealed record PackageSymbolInventory
     public IReadOnlyList<string> TargetFrameworks { get; }
     public InventoryCounters Counters { get; }
     public InventoryCompletenessReport Completeness { get; }
+    public MetadataEnumerationCoverage? MetadataEnumeration { get; }
     public string TextReport => Completeness.ToText(Package, PackageVersion, TargetFrameworks);
 
     private static InventoryCounters CalculateCounters(IReadOnlyList<PackageInventoryItem> items)

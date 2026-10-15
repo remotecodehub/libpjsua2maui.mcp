@@ -8,6 +8,9 @@ public sealed record SourceInspectionCoverage
     public int ManagedMembersApplicableToSwig { get; init; }
     public int ManagedMembersWithSwigCalls { get; init; }
     public int ManagedMembersWithoutDirectSwigCall { get; init; }
+    public int ManagedMembersNotApplicable { get; init; }
+    public int ManagedMembersApplicabilityUnknown { get; init; }
+    public int ManagedMembersUnparsed { get; init; }
     public int SwigCallsDiscovered { get; init; }
     public int SwigCallsWithoutPInvoke { get; init; }
     public int SwigCallsResolvedToPInvoke { get; init; }
@@ -28,6 +31,9 @@ public sealed record SourceInspectionCoverage
             ManagedMembersApplicableToSwig = ManagedMembersApplicableToSwig + other.ManagedMembersApplicableToSwig,
             ManagedMembersWithSwigCalls = ManagedMembersWithSwigCalls + other.ManagedMembersWithSwigCalls,
             ManagedMembersWithoutDirectSwigCall = ManagedMembersWithoutDirectSwigCall + other.ManagedMembersWithoutDirectSwigCall,
+            ManagedMembersNotApplicable = ManagedMembersNotApplicable + other.ManagedMembersNotApplicable,
+            ManagedMembersApplicabilityUnknown = ManagedMembersApplicabilityUnknown + other.ManagedMembersApplicabilityUnknown,
+            ManagedMembersUnparsed = ManagedMembersUnparsed + other.ManagedMembersUnparsed,
             SwigCallsDiscovered = SwigCallsDiscovered + other.SwigCallsDiscovered,
             SwigCallsWithoutPInvoke = SwigCallsWithoutPInvoke + other.SwigCallsWithoutPInvoke,
             SwigCallsResolvedToPInvoke = SwigCallsResolvedToPInvoke + other.SwigCallsResolvedToPInvoke,

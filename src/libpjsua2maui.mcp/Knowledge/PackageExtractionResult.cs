@@ -16,7 +16,8 @@ public sealed record PackageExtractionResult
         IReadOnlyList<PlatformEvidence>? platformEvidence = null,
         SourceInspectionCoverage? sourceCoverage = null,
         IReadOnlyList<SourceInspectionDiagnostic>? sourceDiagnostics = null,
-        PackageSymbolInventory? inventory = null)
+        PackageSymbolInventory? inventory = null,
+        MetadataEnumerationCoverage? metadataEnumerationCoverage = null)
     {
         Acquisition = acquisition ?? throw new ArgumentNullException(nameof(acquisition));
         Symbols = Array.AsReadOnly((symbols ?? throw new ArgumentNullException(nameof(symbols))).ToArray());
@@ -28,6 +29,7 @@ public sealed record PackageExtractionResult
         PlatformEvidence = Array.AsReadOnly((platformEvidence ?? []).ToArray());
         SourceCoverage = sourceCoverage ?? new SourceInspectionCoverage();
         SourceDiagnostics = Array.AsReadOnly((sourceDiagnostics ?? []).ToArray());
+        MetadataEnumerationCoverage = metadataEnumerationCoverage;
         Inventory = inventory ?? PackageSymbolInventoryBuilder.Build(this);
         Errors = new ReadOnlyCollection<string>([]);
     }
@@ -42,6 +44,7 @@ public sealed record PackageExtractionResult
     public IReadOnlyList<PlatformEvidence> PlatformEvidence { get; }
     public SourceInspectionCoverage SourceCoverage { get; }
     public IReadOnlyList<SourceInspectionDiagnostic> SourceDiagnostics { get; }
+    public MetadataEnumerationCoverage? MetadataEnumerationCoverage { get; }
     public IReadOnlyList<string> Errors { get; }
     public PackageSymbolInventory Inventory { get; }
 }

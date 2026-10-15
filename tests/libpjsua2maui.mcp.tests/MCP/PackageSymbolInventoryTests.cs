@@ -16,9 +16,18 @@ public sealed class PackageSymbolInventoryTests
         var item = new PackageInventoryItem(package, version, "libpjsua2maui", symbol, InspectionStatus.NotInspected, SymbolOrigin.UnknownOrigin, null!, null);
         var inventory = new PackageSymbolInventory([item]);
         var empty = new PackageSymbolInventory([]);
+        var provenEmpty = new PackageSymbolInventory([], new MetadataEnumerationCoverage
+        {
+            ExpectedManagedAssemblies = 0,
+            InspectedManagedAssemblies = 0,
+            SymbolEnumerationCompleted = true
+        });
 
         Assert.False(inventory.Completeness.InventoryComplete);
         Assert.Equal(100m, empty.Completeness.TypeInspectionPercentage);
+        Assert.True(provenEmpty.Completeness.InventoryComplete);
+        Assert.True(provenEmpty.Completeness.DiscoveryDenominatorProven);
+        Assert.Equal(100m, provenEmpty.Completeness.DiscoveryCompletenessPercentage);
         Assert.Contains("Package: unknown", empty.Completeness.ToText(null, null, []), StringComparison.Ordinal);
         Assert.Empty(empty.TargetFrameworks);
         Assert.Empty(item.Evidence);
@@ -63,8 +72,8 @@ public sealed class PackageSymbolInventoryTests
         Assert.Equal(first.Inventory.Items.Sum(item => item.Evidence.Count), first.Inventory.Counters.TotalTfmEvidence);
         Assert.True(first.Inventory.Completeness.SourceEvidenceCoveragePercentage < 100m);
         Assert.Equal(0m, first.Inventory.Completeness.XmlDocumentationCoveragePercentage);
-        Assert.False(first.Inventory.Completeness.DiscoveryDenominatorProven);
-        Assert.Null(first.Inventory.Completeness.DiscoveryCompletenessPercentage);
+        Assert.True(first.Inventory.Completeness.DiscoveryDenominatorProven);
+        Assert.Equal(100m, first.Inventory.Completeness.DiscoveryCompletenessPercentage);
         Assert.Contains(first.Inventory.Items, item => item.Symbol.Identity.QualifiedName.Contains(".Nested", StringComparison.Ordinal));
     }
 

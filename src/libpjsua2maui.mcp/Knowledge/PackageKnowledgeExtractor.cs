@@ -29,6 +29,11 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         var sourceCoverage = new SourceInspectionCoverage();
         var sourceDiagnostics = new List<SourceInspectionDiagnostic>();
         var sourceContents = new Dictionary<string, string>(StringComparer.Ordinal);
+        var primaryAssemblies = acquisition.Manifest.Artifacts
+            .Where(a => a.Kind == ArtifactKind.ManagedAssembly && IsPrimaryLibAssembly(a))
+            .OrderBy(a => a.TargetFramework, StringComparer.Ordinal)
+            .ToArray();
+        var inspectedAssemblies = 0;
 
         await using var packageStream = new FileStream(acquisition.ArtifactPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
         using var archive = new System.IO.Compression.ZipArchive(packageStream, System.IO.Compression.ZipArchiveMode.Read);
@@ -63,9 +68,7 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
             }
         }
 
-        foreach (var assemblyArtifact in acquisition.Manifest.Artifacts
-            .Where(a => a.Kind == ArtifactKind.ManagedAssembly && IsPrimaryLibAssembly(a))
-            .OrderBy(a => a.TargetFramework, StringComparer.Ordinal))
+        foreach (var assemblyArtifact in primaryAssemblies)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var assemblyEntry = entries[assemblyArtifact.RelativePath];
@@ -82,6 +85,7 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
                 }
 
                 symbols.AddRange(ReadSymbols(peReader.GetMetadataReader(), acquisition, assemblyArtifact));
+                inspectedAssemblies++;
             }
             catch (Exception exception) when (exception is IOException or BadImageFormatException or InvalidDataException or ArgumentException)
             {
@@ -136,7 +140,12 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
             sourceDiagnostics.AddRange(repositoryInspection.Diagnostics);
         }
 
-        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence, sourceCoverage, sourceDiagnostics);
+        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence, sourceCoverage, sourceDiagnostics, metadataEnumerationCoverage: new MetadataEnumerationCoverage
+        {
+            ExpectedManagedAssemblies = primaryAssemblies.Length,
+            InspectedManagedAssemblies = inspectedAssemblies,
+            SymbolEnumerationCompleted = inspectedAssemblies == primaryAssemblies.Length
+        });
     }
 
     private static void AddPlatformEvidence(ICollection<PlatformEvidence> evidence, PackageAcquisitionResult acquisition, PackageArtifact assembly, KnowledgePlatform platform, IReadOnlyList<PackageArtifact> nativeArtifacts, IReadOnlyList<PackageArtifact> sourceArtifacts)

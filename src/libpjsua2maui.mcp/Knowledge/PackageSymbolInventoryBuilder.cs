@@ -27,7 +27,7 @@ public static class PackageSymbolInventoryBuilder
             .OrderBy(item => item.Identity, StringComparer.Ordinal)
             .ToArray();
 
-        return new PackageSymbolInventory(items);
+        return new PackageSymbolInventory(items, extraction.MetadataEnumerationCoverage);
     }
 
     private static PackageInventoryItem CreateItem(
