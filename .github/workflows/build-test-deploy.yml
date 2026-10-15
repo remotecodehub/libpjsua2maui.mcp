@@ -32,16 +32,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          
       - name: Restore
         run: dotnet restore "${{ env.SOLUTION }}"
+        
       - name: Restore Tools
         run: dotnet tool restore
+        
       - name: Build
         run: dotnet build "${{ env.SOLUTION }}" --configuration Release --no-restore
+        
       - name: Test
         id: test
         shell: pwsh
@@ -67,6 +74,7 @@ jobs:
           $coverageFiles = @(Get-ChildItem -Path $resultsDir -Filter 'coverage.cobertura*.xml' -File -Recurse -ErrorAction SilentlyContinue)
           if ($coverageFiles.Count -eq 0) { Write-Warning "No Cobertura coverage XML was found under $resultsDir." } else { $coverageFiles | ForEach-Object { Write-Host "Coverage XML: $($_.FullName)" } }
           if ($exitCode -ne 0) { Write-Error "Tests failed with exit code $exitCode. Output is available at $outputFile."; exit $exitCode }
+          
       - name: Debug generated artifacts
         if: always()
         shell: pwsh
@@ -82,6 +90,7 @@ jobs:
           path: '${{ env.TEST_RESULTS_DIR }}/**/*.trx'
           reporter: 'dotnet-trx'
           fail-on-error: 'false'
+          
       - name: Generate report
         if: always()
         shell: pwsh
@@ -104,6 +113,7 @@ jobs:
             if (-not (Test-Path $reportPath)) { throw "Expected ReportGenerator output was not produced: $reportPath" }
             Write-Host "Generated report: $reportPath"
           }
+          
       - name: Enforce quality gate (Line, Branch and Method coverage)
         if: always()
         shell: pwsh
@@ -167,6 +177,7 @@ jobs:
             exit 1
           }
           Write-Host "QUALITY GATE: PASSED (minimum $threshold% for line, branch and method coverage)."
+          
       - name: Append test and coverage reports to GitHub Summary
         if: always()
         shell: pwsh
@@ -191,6 +202,7 @@ jobs:
             Add-Content -Path $summaryFile -Value '```'
             Add-Content -Path $summaryFile -Value '</details>'
           }
+          
       - name: Upload test and coverage reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -204,6 +216,7 @@ jobs:
             ${{ env.TEST_RESULTS_DIR }}/test-output.txt
             ${{ env.TEST_RESULTS_DIR }}/test-exit-code.txt
           if-no-files-found: warn
+          
   docker:
     name: Build HTTP Docker image
     runs-on: ubuntu-latest
@@ -211,8 +224,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
+        
       - name: Login to GHCR
         if: startsWith(github.ref, 'refs/tags/')
         uses: docker/login-action@v4
@@ -220,6 +237,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+          
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -229,6 +247,7 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=sha,prefix=sha-,format=short
+            
       - name: Build Docker image
         uses: docker/build-push-action@v7
         with:
@@ -239,6 +258,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          
   nuget:
     name: Continuous Delivery
     runs-on: ubuntu-latest
@@ -247,19 +267,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          
       - name: Restore
         run: dotnet restore "${{ env.STDIO_PROJECT }}"
+        
       - name: Calculate package version
         id: version
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          
       - name: Pack dotnet tool
         run: dotnet pack "${{ env.STDIO_PROJECT }}" --configuration Release --no-restore --output ./artifacts -p:PackageVersion=${{ steps.version.outputs.version }}
+        
       - name: Publish to NuGet
         run: dotnet nuget push "./artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
