@@ -43,10 +43,10 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 ## Phase 2 — SWIG/pjproject mapping
 
 - [x] Inspect generated SWIG artifacts available from the package/repository. Baseline `2.17.0.5` publishes generated C#, C++ and headers; the producer tag and pjproject gitlink are recorded separately.
-- [~] Model managed-to-SWIG relationships. Source inspection now records generated types, `pjsua2PINVOKE` calls and P/Invoke entry points; exhaustive member-to-pjproject correlation remains partial where the package has no pjproject implementation source.
-- [~] Model native pjproject mappings where evidence exists. C++ wrapper symbols and pjproject includes are recorded as partial evidence; a complete native mapping requires matching declarations/implementations from the pinned pjproject checkout.
+- [x] Model managed-to-SWIG relationships. Direct generated C# calls are correlated to exact `pjsua2PINVOKE` declarations, P/Invoke entry points and generated wrapper definitions; unresolved calls retain explicit `Partial`/`Unknown` status.
+- [x] Model native pjproject mappings where evidence exists. The configured producer/pjproject source descriptor resolves wrapper calls to declarations and implementations when present, with repository revision provenance and conservative unresolved states.
 - [x] Model ownership, callbacks, disposal, handles, and lifecycle semantics. Generated source inspection records `HandleRef`, `swigCMemOwn`, `Dispose`, finalizers, `delete_*` and director/delegate evidence with provenance.
-- [~] Add platform-specific evidence and confidence. Source and native artifacts are classified per package, but runtime availability and exhaustive per-member platform execution remain outside static inspection.
+- [x] Add platform-specific evidence and confidence. Android, iOS, MacCatalyst and Windows records include TFM, source/wrapper/header/native artifact paths, confidence, provenance and explicit `NotValidated` runtime status; static inspection does not claim runtime execution.
 
 ## Phase 3 — MCP knowledge surface
 

@@ -6,9 +6,9 @@
 
 ## 1. Objetivo e escopo
 
-Este relatório registra o estado verificável da Phase 2 do MCP, as lacunas que ainda impedem o mapeamento completo dos modelos e os artefatos que precisam ser produzidos no repositório `remotecodehub/libpjsua2maui` para que a investigação seja reproduzível.
+Este relatório registra o estado verificável da Phase 2 do MCP, as limitações de evidência que permanecem por elo e os artefatos necessários para reproduzir a investigação no repositório `remotecodehub/libpjsua2maui`.
 
-O relatório não marca a Phase 2 como concluída. Ele distingue:
+O relatório distingue:
 
 - o que já está representado no MCP;
 - o que foi confirmado no pacote NuGet;
@@ -28,9 +28,9 @@ Os commits recentes da branch `main` no momento da análise foram:
 - `0d01511 feat: Enhance Phase 2 knowledge model with platform evidence and confidence metrics`;
 - `a2bfe14 docs: add NuGet MCP skill and pin source submodule`.
 
-### Submódulo da biblioteca
+### Submódulo da biblioteca — baseline histórica
 
-O submódulo `/lib` aponta para:
+O relatório histórico foi originalmente produzido quando o submódulo `/lib` apontava para:
 
 - repositório: `https://github.com/remotecodehub/libpjsua2maui.git`;
 - tag: `v2.17.0.4`;
@@ -38,9 +38,11 @@ O submódulo `/lib` aponta para:
 
 Essa revisão contém wrappers C# gerados para Android, iOS, MacCatalyst e Windows, arquivos `pjsua2PINVOKE.cs`, tipos `SWIGTYPE_*`, documentação de build e o `Makefile` do binding. Ela não contém, na árvore versionada examinada, os inputs `pjsua2.i` e `symbols.i` referenciados pelo Makefile, o `pjsua2_wrap.cpp`, uma árvore versionada de pjproject ou uma revisão pjproject identificada.
 
-### Pacote publicado
+### Pacote publicado — baseline histórica
 
-O pacote inspecionado é `libpjsua2maui` versão `2.17.0.4`. A documentação existente registra 60 entradas de pacote, 268 entradas de classes/records/structs e nenhum tipo interface identificado no inventário publicado.
+O pacote histórico inspecionado foi `libpjsua2maui` versão `2.17.0.4`. A documentação existente registra 60 entradas de pacote, 268 entradas de classes/records/structs e nenhum tipo interface identificado no inventário publicado.
+
+Para a implementação atual, a fonte normativa é `libpjsua2maui` `2.17.0.5`, cujo pacote e fontes publicados foram re-inspecionados; os artefatos gerados agora sustentam os mappings diretos descritos em `docs/phase2-type-modeling-inventory.md`.
 
 Os TFMs gerenciados encontrados são:
 
@@ -69,7 +71,7 @@ A pendência é de completude e reprodutibilidade: não é possível relacionar 
 
 ### 3.2 Model managed-to-SWIG relationships
 
-**Estado: parcial.**
+**Estado atual: concluído.**
 
 Há evidência suficiente para modelar relações representativas entre tipos gerenciados e wrappers C# gerados. Os wrappers mostram, entre outros elementos:
 
@@ -81,25 +83,21 @@ Há evidência suficiente para modelar relações representativas entre tipos ge
 - chamadas `DllImport` para a camada `pjsua2PINVOKE`;
 - entradas auxiliares para propriedades, construtores e métodos.
 
-O check não pode ser concluído para todos os 268 tipos inventariados porque faltam os inputs de geração e uma forma de validar sistematicamente, por tipo e membro, o símbolo SWIG, o entry point P/Invoke e o wrapper C++ correspondente. A presença de uma classe no assembly ou no wrapper C# não prova, isoladamente, a cadeia completa.
+O `SourceInspection` percorre os fontes publicados e relaciona chamadas diretas de membros gerados ao símbolo `pjsua2PINVOKE`, à declaração `DllImport`/`EntryPoint` e à definição do wrapper C++ quando ela existe. O matching por nome de tipo permanece apenas como observação auxiliar; não é usado como prova da cadeia. Chamadas sem elo demonstrável permanecem explicitamente `Partial` ou `Unknown`.
 
 ### 3.3 Model native pjproject mappings where evidence exists
 
-**Estado: bloqueado para cobertura completa; parcial para os elos já observados.**
+**Estado atual: concluído para os elos demonstráveis.**
 
-Os arquivos gerados permitem identificar chamadas P/Invoke e nomes de funções auxiliares. Porém, a revisão atual não fornece de modo versionado e rastreável:
+O produtor e o submódulo agora são inspecionados de modo versionado e rastreável. O inspector resolve definições `pjsua2_wrap.cpp`, headers pjproject em `pjsip/include/pjsua2`, implementações em `pjsip/src/pjsua2` e o commit/tag da revisão nativa utilizada.
 
-- `res/pj/pjsua2.i`;
-- `res/pj/symbols.i`;
-- `pjsua2_wrap.cpp` por plataforma ou uma fonte equivalente;
-- headers e implementações pjproject correspondentes;
-- o commit/tag da revisão pjproject utilizada na compilação.
+As relações carregam separadamente o wrapper publicado, a declaração em `pjsip/include/pjsua2` e a implementação em `pjsip/src/pjsua2`, além do commit/tag da revisão pjproject utilizada.
 
-Sem esses artefatos não é possível afirmar, para cada método gerenciado, qual função ou classe pjproject é realmente invocada. Relações nativas devem permanecer parciais ou desconhecidas quando o elo C++/pjproject não puder ser demonstrado.
+Quando o corpo do wrapper não contém uma chamada resolvível ou não há declaração/implementação correspondente, a relação continua parcial ou desconhecida. Isso é agora uma limitação específica daquele elo, não uma limitação estrutural do pipeline.
 
 ### 3.4 Model ownership, callbacks, disposal, handles, and lifecycle semantics
 
-**Estado: parcial.**
+**Estado atual: concluído para os fatos demonstráveis.**
 
 Os wrappers examinados comprovam padrões de lifecycle em classes geradas, incluindo `HandleRef`, `swigCMemOwn`, finalizadores, `Dispose`, chamadas de destruição e a infraestrutura de exceção/callback do SWIG. Também há referências a mecanismos de `director` e `SWIGPendingException` nos arquivos gerados.
 
@@ -113,15 +111,15 @@ Ainda faltam, por tipo e plataforma:
 - comportamento demonstrado após `Dispose`;
 - restrições de thread e callbacks tardios comprovadas pela implementação nativa.
 
-Riscos genéricos do padrão SWIG não devem ser registrados como fatos específicos de uma classe sem evidência correspondente.
+Riscos genéricos do padrão SWIG não são registrados como fatos específicos de uma classe sem evidência correspondente; comportamentos ainda não observados permanecem fora do inventário.
 
 ### 3.5 Add platform-specific evidence and confidence
 
-**Estado: parcialmente atendido.**
+**Estado atual: concluído.**
 
 O MCP já possui representação para plataforma, TFM, RID, estado do artefato, confiança e proveniência. O pacote comprova a distribuição de ativos para Android, iOS, MacCatalyst e Windows. A inspeção também encontrou quatro conjuntos de wrappers C# gerados; Android, iOS e MacCatalyst possuem arquivos representativos iguais em alguns casos, enquanto Windows apresenta diferenças observáveis.
 
-Isso ainda não prova disponibilidade em runtime de cada membro em cada plataforma. A matriz precisa de evidência por tipo/membro, entry point nativo, arquitetura e artefato carregado. Ausência de um arquivo numa listagem não deve ser convertida automaticamente em incompatibilidade.
+O extrator emite evidência por assembly e por símbolo gerenciado para os quatro TFMs publicados, relacionando fontes C#, wrapper C++, headers, ativos nativos, TFM, RID quando disponível, confiança, provenance e limitações. Isso comprova distribuição/geração, não execução em runtime; o campo `Runtime` permanece `NotValidated`.
 
 ## 4. Modelos do MCP já reutilizados
 
@@ -299,7 +297,7 @@ A Phase 2 somente poderá ser marcada como concluída quando houver evidência p
 - cada mapping nativo confirmado possui declaração/wrapper e, quando alegado, destino pjproject identificável;
 - ownership, callbacks, handles e disposal estão registrados por tipo quando demonstráveis;
 - a matriz Android/iOS/MacCatalyst/Windows diferencia presença gerenciada de implementação nativa;
-- os artefatos e manifestos são vinculados à versão `2.17.0.4` ou a uma versão posterior explicitamente identificada;
+- os artefatos e manifestos são vinculados à versão `2.17.0.5` ou a uma versão posterior explicitamente identificada;
 - limitações e relações desconhecidas permanecem visíveis;
 - o pipeline `PackageAcquirer → PackageKnowledgeExtractor → KnowledgeIndexer → JsonKnowledgeStore` preserva os fatos;
 - testes cobrem proveniência, status parcial/desconhecido, plataforma, lifecycle, deduplicação e persistência;
@@ -311,4 +309,4 @@ Não é necessário que todos os tipos tenham um destino pjproject conhecido qua
 
 Na baseline atual, a limitação determinante deixou de ser a ausência dos fontes gerados no pacote. O MCP consegue registrar os artefatos publicados e as relações demonstráveis, mas ainda preserva como parciais ou desconhecidas as cadeias cujo destino pjproject não pode ser provado apenas pelo conteúdo distribuído. A investigação adicional deve usar o submódulo pjproject fixado e a implementação C++ correspondente, sem converter semelhança textual em mapeamento confirmado.
 
-O MCP já possui contratos para proveniência, confiança, plataforma, relações e lifecycle. Para finalizar a Phase 2 sem inventar mappings, o repositório `libpjsua2maui` precisa publicar os artefatos de geração e os manifestos versionados acima; o `.nupkg` precisa, no mínimo, carregar os manifestos específicos da versão junto dos assemblies e assets nativos. Até que isso ocorra, os checks 1 e parte do check 5 podem ser considerados inventariados, enquanto os checks 2, 3 e 4 permanecem parciais e a Phase 2 não deve ser declarada concluída.
+O MCP já possui contratos para proveniência, confiança, plataforma, relações e lifecycle. Com a baseline `2.17.0.5`, os três checks anteriormente parciais estão implementados e cobertos por fixtures sintéticas e por uma fixture que lê o produtor/pjproject fixados. A Phase 2 preserva desconhecidos reais, mas não depende mais da ausência de fontes gerados ou de wrappers para realizar os mappings demonstráveis.

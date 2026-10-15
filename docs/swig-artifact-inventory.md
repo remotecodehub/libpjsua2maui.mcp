@@ -30,4 +30,4 @@ The repository also contains `res/pj/pjsua2maui/Makefile`, which documents SWIG 
 
 ## Classification boundary
 
-Package entries remain `PackageArtifact` observations, including published managed/native sources. Generated source files, PINVOKE entry points and SWIG opaque types are now package evidence when their `src/` paths are present; Makefile inputs and pjproject files remain repository/submodule evidence unless separately packaged. Native pjproject mappings remain partial unless a wrapper call and native declaration/implementation are both available.
+Package entries remain `PackageArtifact` observations, including published managed/native sources. Generated source files, PINVOKE entry points and SWIG opaque types are now package evidence when their `src/` paths are present; Makefile inputs and pjproject files remain repository/submodule evidence unless separately packaged. The mapping inspector resolves wrapper calls to pjproject declarations and implementations when the configured pinned repository contains them, while preserving `Partial`/`Unknown` for genuinely unresolved links.

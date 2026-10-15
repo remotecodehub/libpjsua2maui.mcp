@@ -44,6 +44,9 @@ public sealed class Phase2KnowledgeModelTests
             Assert.Equal(KnowledgePlatform.Android, platform.Platform);
             Assert.Equal(PlatformArtifactStatus.Present, platform.ManagedAssembly);
             Assert.Equal(KnowledgeConfidence.Strong, platform.Confidence);
+            Assert.Equal(PlatformArtifactStatus.Unknown, platform.ManagedSource);
+            Assert.Equal(PlatformRuntimeStatus.NotValidated, platform.Runtime);
+            Assert.Contains("lib/net10.0-android/libpjsua2maui.dll", platform.ArtifactPaths);
             Assert.Contains("runtime", platform.Limitations!, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(Path.GetDirectoryName(path)!, Encoding.UTF8.GetString(await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken)));
         }
@@ -149,7 +152,7 @@ public sealed class Phase2KnowledgeModelTests
         var source = new FactProvenance(identity, ProvenanceKind.RepositorySource, sourceReference: "src/libpjsua2maui/Platforms/Android/pjsua2maui/pjsua2/Account.cs", limitations: "Generated source does not identify a single pjproject symbol.");
         var relation = new KnowledgeRelationship(identity, "managed-to-native", managed, native, KnowledgeFactStatus.Partial, source);
         var lifecycle = new LifecycleFact(identity, managed, LifecycleFactKind.Disposal, KnowledgeFactStatus.Established, "Dispose clears HandleRef and conditionally invokes delete_Account.", new FactProvenance(identity, ProvenanceKind.RepositorySource, sourceReference: "src/libpjsua2maui/Platforms/Android/pjsua2maui/pjsua2/Account.cs", limitations: "The generated disposal path demonstrates native destruction only when swigCMemOwn is true."));
-        var platform = new PlatformEvidence(identity, managed, KnowledgePlatform.Android, "net10.0-android", "android-arm64", PlatformArtifactStatus.Present, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Strong, new FactProvenance(identity, ProvenanceKind.PackageArtifact, assembly.RelativePath, targetFramework: "net10.0-android", runtimeIdentifier: "android-arm64"), "Runtime loading was not executed.");
+        var platform = new PlatformEvidence(identity, managed, KnowledgePlatform.Android, "net10.0-android", "android-arm64", PlatformArtifactStatus.Present, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Strong, new FactProvenance(identity, ProvenanceKind.PackageArtifact, assembly.RelativePath, targetFramework: "net10.0-android", runtimeIdentifier: "android-arm64"), "Runtime loading was not executed.", PlatformArtifactStatus.Unknown, PlatformArtifactStatus.Unknown, PlatformArtifactStatus.Unknown, PlatformRuntimeStatus.NotValidated, [assembly.RelativePath]);
         return new PackageExtractionResult(acquisition, [], [], [], [], [relation], [lifecycle], [platform]);
     }
 }

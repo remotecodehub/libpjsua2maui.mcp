@@ -172,6 +172,10 @@ public sealed class PackageAcquirer(HttpClient httpClient, PackageAcquisitionOpt
             if (kind == ArtifactKind.Other)
             {
                 kind = ClassifySource(path);
+                if (kind is ArtifactKind.ManagedSource or ArtifactKind.NativeSource or ArtifactKind.NativeHeader)
+                {
+                    tfm = FindSourceTargetFramework(path, entries.Keys);
+                }
             }
 
             if (kind == ArtifactKind.Other && IsSwigPath(path))
@@ -228,6 +232,31 @@ public sealed class PackageAcquirer(HttpClient httpClient, PackageAcquisitionOpt
             ".h" or ".hpp" => ArtifactKind.NativeHeader,
             _ => ArtifactKind.Other
         };
+    }
+
+    private static string? FindSourceTargetFramework(string path, IEnumerable<string> entries)
+    {
+        var platform = path.Split('/').FirstOrDefault(part => part.Equals("Android", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("iOS", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("MacCatalyst", StringComparison.OrdinalIgnoreCase) ||
+            part.Equals("Windows", StringComparison.OrdinalIgnoreCase));
+        if (platform is null)
+        {
+            return null;
+        }
+
+        return entries
+            .Where(entry => entry.StartsWith("lib/", StringComparison.OrdinalIgnoreCase) && entry.EndsWith("/libpjsua2maui.dll", StringComparison.OrdinalIgnoreCase))
+            .Select(entry => entry.Split('/')[1])
+            .Order(StringComparer.Ordinal)
+            .FirstOrDefault(tfm => platform switch
+            {
+                "Android" => tfm.Contains("android", StringComparison.OrdinalIgnoreCase),
+                "iOS" => tfm.Contains("ios", StringComparison.OrdinalIgnoreCase) && !tfm.Contains("maccatalyst", StringComparison.OrdinalIgnoreCase),
+                "MacCatalyst" => tfm.Contains("maccatalyst", StringComparison.OrdinalIgnoreCase),
+                "Windows" => tfm.Contains("windows", StringComparison.OrdinalIgnoreCase),
+                _ => false
+            });
     }
 
     private static bool IsPackageMetadataPath(string path)

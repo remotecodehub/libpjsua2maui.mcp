@@ -401,4 +401,52 @@ public sealed class KnowledgeModelTests
         Assert.Null(relationship.Target);
         Assert.Equal("model-theory", identity.Revision);
     }
+
+    [Fact]
+    public void PlatformEvidence_NormalizesArtifactPathsAndKeepsLayerStatuses()
+    {
+        var version = PackageVersion.Parse("2.17.0.5");
+        var identity = new KnowledgeSetIdentity(Package, version);
+        var subject = new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, KnowledgeNodeResolution.Identified, "Account");
+        var evidence = new PlatformEvidence(identity, subject, KnowledgePlatform.Windows, "net10.0-windows10.0.19041", null,
+            PlatformArtifactStatus.Present, PlatformArtifactStatus.Present, KnowledgeConfidence.Strong,
+            managedSource: PlatformArtifactStatus.Present, nativeSource: PlatformArtifactStatus.Present,
+            nativeHeader: PlatformArtifactStatus.Present, runtime: PlatformRuntimeStatus.NotValidated,
+            artifactPaths: ["z.cpp", "", "a.cs", "a.cs"]);
+
+        Assert.Equal(["a.cs", "z.cpp"], evidence.ArtifactPaths);
+        Assert.Equal(PlatformArtifactStatus.Present, evidence.NativeHeader);
+        Assert.Equal(PlatformRuntimeStatus.NotValidated, evidence.Runtime);
+    }
+
+    [Fact]
+    public void PlatformEvidence_RejectsBlankOptionalTextAndForeignProvenance()
+    {
+        var identity = new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.5"));
+        var subject = new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, KnowledgeNodeResolution.Identified, "Account");
+        Assert.Throws<ArgumentNullException>(() => new PlatformEvidence(null!, subject, KnowledgePlatform.Android, null, null,
+            PlatformArtifactStatus.Unknown, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Unknown));
+        Assert.Throws<ArgumentNullException>(() => new PlatformEvidence(identity, null!, KnowledgePlatform.Android, null, null,
+            PlatformArtifactStatus.Unknown, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Unknown));
+        Assert.Throws<ArgumentException>(() => new PlatformEvidence(identity, subject, KnowledgePlatform.Android, " ", null,
+            PlatformArtifactStatus.Unknown, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Unknown));
+        Assert.Throws<ArgumentException>(() => new PlatformEvidence(identity, subject, KnowledgePlatform.Android, null, null,
+            PlatformArtifactStatus.Unknown, PlatformArtifactStatus.Unknown, KnowledgeConfidence.Unknown,
+            provenance: new FactProvenance(new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.6")), ProvenanceKind.PackageArtifact, "lib/a.dll")));
+    }
+
+    [Fact]
+    public void LifecycleAndRelationshipModelsPreserveUnknownEndpointsAndBlankValues()
+    {
+        var identity = new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.5"));
+        var subject = new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, KnowledgeNodeResolution.Identified, "Account");
+        var lifecycle = new LifecycleFact(identity, subject, LifecycleFactKind.Dependency, KnowledgeFactStatus.Unknown, " ");
+        var relationship = new KnowledgeRelationship(identity, "managed-to-native", subject, null, KnowledgeFactStatus.Unknown);
+
+        Assert.Null(lifecycle.Value);
+        Assert.Equal(KnowledgeNodeResolution.Unknown, relationship.TargetNode.Resolution);
+        Assert.Null(relationship.Target);
+        Assert.Throws<ArgumentNullException>(() => new LifecycleFact(null!, subject, LifecycleFactKind.Dependency, KnowledgeFactStatus.Unknown));
+        Assert.Throws<ArgumentNullException>(() => new LifecycleFact(identity, null!, LifecycleFactKind.Dependency, KnowledgeFactStatus.Unknown));
+    }
 }

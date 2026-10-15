@@ -153,11 +153,11 @@ public sealed class PackageKnowledgeExtractorTests
 
         var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
 
-        var evidence = Assert.Single(result.PlatformEvidence);
+        var evidence = Assert.Single(result.PlatformEvidence, item => item.Subject.Identifier == $"assembly:lib/{tfm}/libpjsua2maui.dll");
         Assert.Equal(platform, evidence.Platform);
         Assert.Equal(tfm, evidence.TargetFramework);
         Assert.Equal(PlatformArtifactStatus.Present, evidence.NativeArtifact);
-        Assert.Equal(KnowledgeConfidence.Confirmed, evidence.Confidence);
+        Assert.Equal(KnowledgeConfidence.Strong, evidence.Confidence);
         Assert.Contains(nativePath, evidence.Provenance!.SourceReference!, StringComparison.Ordinal);
     }
 
@@ -168,10 +168,44 @@ public sealed class PackageKnowledgeExtractorTests
 
         var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
 
-        var evidence = Assert.Single(result.PlatformEvidence);
+        var evidence = Assert.Single(result.PlatformEvidence, item => item.Subject.Identifier == "assembly:lib/net10.0/libpjsua2maui.dll");
         Assert.Equal(KnowledgePlatform.Unknown, evidence.Platform);
         Assert.Equal(PlatformArtifactStatus.Unknown, evidence.NativeArtifact);
         Assert.Equal(KnowledgeConfidence.Strong, evidence.Confidence);
+    }
+
+    [Theory]
+    [InlineData("net10.0-android36.0", "Android", "runtimes/android-arm64/native/libpjsua2.so", KnowledgePlatform.Android)]
+    [InlineData("net10.0-ios26.0", "iOS", "runtimes/ios-arm64/native/libpjsua2.a", KnowledgePlatform.iOS)]
+    [InlineData("net10.0-maccatalyst26.0", "MacCatalyst", "runtimes/maccatalyst-arm64/native/libpjsua2.a", KnowledgePlatform.MacCatalyst)]
+    [InlineData("net10.0-windows10.0.19041", "Windows", "runtimes/win-x64/native/pjsua2.dll", KnowledgePlatform.Windows)]
+    public async Task ExtractAsync_RecordsSourceAndNativeEvidenceForEachPublishedPlatform(string tfm, string platform, string nativePath, KnowledgePlatform expectedPlatform)
+    {
+        using var package = CreatePackage(
+            tfm,
+            typeof(PackageVersion).Assembly.Location,
+            "<doc><members /></doc>",
+            nativePath: nativePath,
+            sourceEntries:
+            [
+                ($"src/Platforms/{platform}/pjsua2maui/pjsua2/Account.cs", "public class Account { public void create() { pjsua2PINVOKE.Account_create(); } }"),
+                ($"src/Platforms/{platform}/pjsua2maui/pjsua2/pjsua2PINVOKE.cs", "[DllImport(\"pjsua2\", EntryPoint=\"CSharp_libpjsua2fmaui_Account_create___\")] internal static extern void Account_create();"),
+                ($"src/Platforms/{platform}/cpp/pjsua2_wrap.cpp", "void CSharp_libpjsua2fmaui_Account_create___() {}"),
+                ($"src/Platforms/{platform}/cpp/pjsua2_wrap.h", "void CSharp_libpjsua2fmaui_Account_create___();")
+            ]);
+
+        var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+        var evidence = Assert.Single(result.PlatformEvidence, item => item.Subject.Identifier == $"assembly:lib/{tfm}/libpjsua2maui.dll");
+
+        Assert.Equal(expectedPlatform, evidence.Platform);
+        Assert.Equal(PlatformArtifactStatus.Present, evidence.ManagedSource);
+        Assert.Equal(PlatformArtifactStatus.Present, evidence.NativeSource);
+        Assert.Equal(PlatformArtifactStatus.Present, evidence.NativeHeader);
+        Assert.Equal(PlatformArtifactStatus.Present, evidence.NativeArtifact);
+        Assert.Equal(PlatformRuntimeStatus.NotValidated, evidence.Runtime);
+        Assert.Equal(KnowledgeConfidence.Confirmed, evidence.Confidence);
+        Assert.Contains($"src/Platforms/{platform}/cpp/pjsua2_wrap.cpp", evidence.ArtifactPaths);
+        Assert.Contains(tfm, evidence.Provenance!.TargetFramework);
     }
 
     [Fact]
@@ -195,6 +229,40 @@ public sealed class PackageKnowledgeExtractorTests
         Assert.Contains(result.Acquisition.Manifest.Artifacts, item => item.Kind == ArtifactKind.NativeHeader);
         Assert.Contains(result.Relationships, item => item.RelationshipType == "native-to-pjproject-text");
         Assert.Contains(result.LifecycleFacts, item => item.Kind == LifecycleFactKind.Disposal);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_UsesConfiguredRepositoryToResolveNativeMappings()
+    {
+        var repositoryRoot = Path.Combine(Path.GetTempPath(), $"phase2-repository-{Guid.NewGuid():N}");
+        var pjRoot = Path.Combine(repositoryRoot, "pjproject");
+        Directory.CreateDirectory(Path.Combine(pjRoot, "pjsip", "include", "pjsua2"));
+        Directory.CreateDirectory(Path.Combine(pjRoot, "pjsip", "src", "pjsua2"));
+        File.WriteAllText(Path.Combine(pjRoot, "pjsip", "include", "pjsua2", "account.hpp"), "namespace pj { class Account { public: void create(); }; }");
+        File.WriteAllText(Path.Combine(pjRoot, "pjsip", "src", "pjsua2", "account.cpp"), "void Account::create() { }");
+        using var package = CreatePackage(
+            "net10.0-windows10.0.19041",
+            typeof(PackageVersion).Assembly.Location,
+            "<doc><members /></doc>",
+            sourceEntries:
+            [
+                ("src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs", "public class Account { public void create() { pjsua2PINVOKE.Account_create(); } }"),
+                ("src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs", "[DllImport(\"pjsua2\", EntryPoint=\"CSharp_libpjsua2fmaui_Account_create___\")] internal static extern void Account_create();"),
+                ("src/Platforms/Windows/cpp/pjsua2_wrap.cpp", "void CSharp_libpjsua2fmaui_Account_create___() { pj::Account *arg1 = 0; (arg1)->create(); }")
+            ]);
+        var descriptor = new SourceRepositoryDescriptor(repositoryRoot, "https://example.test/producer.git", "producer-revision", "v2.17.0.5", pjRoot, "https://example.test/pjproject.git", "pjproject-revision");
+
+        try
+        {
+            var result = await new PackageKnowledgeExtractor(descriptor).ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+
+            Assert.Contains(result.Relationships, item => item.RelationshipType == "native-wrapper-to-pjproject-declaration" && item.Status == KnowledgeFactStatus.Established && item.Provenance!.Kind == ProvenanceKind.RepositorySource);
+            Assert.Contains(result.Relationships, item => item.RelationshipType == "pjproject-declaration-to-implementation");
+        }
+        finally
+        {
+            if (Directory.Exists(repositoryRoot)) Directory.Delete(repositoryRoot, recursive: true);
+        }
     }
 
 

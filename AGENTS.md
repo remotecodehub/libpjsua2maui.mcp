@@ -17,7 +17,7 @@ Also inspect the current solution and existing project files before introducing 
 ## Source of truth
 The MCP is a knowledge/query service, not a runtime replacement for pjproject. Its knowledge must be version-aware and should prefer the actually published `libpjsua2maui.nupkg`, generated C# SWIG bindings, XML documentation when available, and repository metadata over assumptions. Preserve provenance from C# symbol to SWIG/native pjproject mapping whenever that information can be established.
 
-The repository at `/lib` is a Git submodule pinned to `libpjsua2maui` tag `v2.17.0.4` (commit `03e4cf1194b810085447d0b1add34fbb5a9c8d58`). Use `.github/skills/nupkg-nuget-mcp/SKILL.md` when inspecting the published package with NugetMcpServer. Keep package evidence, source-submodule evidence, and build-workflow evidence distinct: a file present in `/lib` is not necessarily present in the `.nupkg`.
+The repository at `/lib` is a Git submodule currently checked out at `libpjsua2maui` tag `v2.17.0.5` (commit `7dfdd229f944b5f236b27cc19cdc97c3cf717567`), with pjproject gitlink commit `5a457451fa2712ba18e12b01738e8ff3af2b26fd`. Use `.github/skills/nupkg-nuget-mcp/SKILL.md` when inspecting the published package with NugetMcpServer. Keep package evidence, source-submodule evidence, and build-workflow evidence distinct: a file present in `/lib` is not necessarily present in the `.nupkg`.
 
 `libpjsua2maui` wraps native pjproject per MAUI target. Do not assume that a managed type implies identical native availability on Android, iOS, MacCatalyst, and Windows.
 

@@ -23,11 +23,11 @@ The source tree contains 315 generated C# files per platform directory for Andro
 
 ## Relationship and lifecycle status
 
-- Confirmed managed-to-SWIG observations: generated class headers and direct calls from `Account.cs`/`Endpoint.cs` to platform-local `pjsua2PINVOKE` methods; overload suffixes such as `__SWIG_0`/`__SWIG_1` are preserved as textual generated symbols.
-- Partial SWIG/native observations: `DllImport("pjsua2")` and named `CSharp_libpjsua2fmaui_*` entry points are confirmed in PINVOKE; the native C++ wrapper body is unavailable, so the exact pjproject endpoint remains unknown.
+- Confirmed managed-to-SWIG observations: direct calls from generated managed members are correlated to platform-local `pjsua2PINVOKE` declarations, exact `DllImport` entry points and generated C++ wrapper definitions. Overload suffixes such as `__SWIG_0`/`__SWIG_1` are preserved as exact symbols.
+- Native observations: when `PackageKnowledgeExtractor` is configured with the pinned `SourceRepositoryDescriptor`, wrapper bodies are resolved to pjproject declarations and implementations in `lib/pjproject`; missing links remain `Partial` or `Unknown` with no fabricated target identifier.
 - Lifecycle facts confirmed in generated source: `HandleRef`, `swigCMemOwn`, `Dispose`, finalizers, conditional `delete_Account`, director connection, and SWIG pending-exception callbacks. These facts are class-specific.
-- Unknowns retained explicitly: exact `pjsua2.i` declarations, wrapper C++ implementations, pjproject declaration/implementation chains, and runtime callback/thread behavior.
+- Unknowns retained explicitly: mappings for wrapper bodies without a resolvable pjproject declaration, and runtime callback/thread behavior. Static source inspection never promotes runtime execution to `ValidatedAvailable`.
 
 ## Platform evidence
 
-The extractor now emits one `PlatformEvidence` observation per managed TFM. It records managed assembly presence, matching native package asset presence, TFM, platform, confidence, provenance and limitations. Package asset presence is `Confirmed` evidence for distribution; runtime execution remains outside this phase and is explicitly limited in the fact.
+The extractor emits assembly-level and managed-symbol-level `PlatformEvidence` observations for the four published TFMs: `net10.0-android36.0`, `net10.0-ios26.0`, `net10.0-maccatalyst26.0` and `net10.0-windows10.0.19041`. Each record includes generated C# source, wrapper C++, header and native asset statuses, concrete package paths, confidence, provenance and `NotValidated` runtime status. Package asset presence is distribution evidence; runtime execution remains outside this phase.

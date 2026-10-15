@@ -88,6 +88,135 @@ public sealed class SourceInspectionTests
         Assert.Empty(result.Symbols);
     }
 
+    [Fact]
+    public void Inspect_NativeWrapperWithIncompleteBodyStillIndexesTheWrapperSymbol()
+    {
+        var (acquisition, artifact) = CreateFixture("src/Platforms/iOS/cpp/incomplete.cpp", ArtifactKind.NativeSource);
+
+        var result = new SourceInspection().Inspect(acquisition, artifact, "void CSharp_libpjsua2fmaui_incomplete() {");
+
+        Assert.Contains("CSharp_libpjsua2fmaui_incomplete", result.Symbols);
+    }
+
+    [Fact]
+    public void InspectRepositoryMappings_ResolvesManagedPInvokeWrapperAndPjprojectImplementation()
+    {
+        using var repository = CreateRepository(
+            "class Account { public void create() { pjsua2PINVOKE.Account_create__SWIG_0(); } }",
+            "[DllImport(\"pjsua2\", EntryPoint=\"CSharp_libpjsua2fmaui_Account_create__SWIG_0___\")] internal static extern void Account_create__SWIG_0();",
+            "void CSharp_libpjsua2fmaui_Account_create__SWIG_0___(void *jarg1) { pj::Account *arg1 = 0; (arg1)->create(); }",
+            "namespace pj { class Account { public: void create(); }; }",
+            "void Account::create() { }");
+        var acquisition = CreateAcquisition(repository.RootPath);
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs"] = repository.Managed,
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs"] = repository.PInvoke,
+            ["src/Platforms/Windows/cpp/pjsua2_wrap.cpp"] = repository.Wrapper
+        };
+
+        var relationships = new SourceInspection().InspectRepositoryMappings(acquisition, sources, repository.Descriptor);
+
+        Assert.Contains(relationships, item => item.RelationshipType == "managed-member-to-swig-call" && item.Status == KnowledgeFactStatus.Established);
+        Assert.Contains(relationships, item => item.RelationshipType == "swig-call-to-pinvoke" && item.Status == KnowledgeFactStatus.Established);
+        var wrapper = Assert.Single(relationships, item => item.RelationshipType == "pinvoke-to-native-wrapper");
+        Assert.Equal(KnowledgeFactStatus.Established, wrapper.Status);
+        var declaration = Assert.Single(relationships, item => item.RelationshipType == "native-wrapper-to-pjproject-declaration");
+        Assert.Equal(KnowledgeFactStatus.Established, declaration.Status);
+        Assert.Contains(relationships, item => item.RelationshipType == "pjproject-declaration-to-implementation" && item.Status == KnowledgeFactStatus.Established);
+        Assert.All(relationships.Where(item => item.RelationshipType.Contains("pjproject", StringComparison.Ordinal)), item =>
+        {
+            Assert.Equal(ProvenanceKind.RepositorySource, item.Provenance!.Kind);
+            Assert.Contains(repository.Descriptor.PjprojectRevision, item.Provenance.Evidence!);
+        });
+    }
+
+    [Fact]
+    public void InspectRepositoryMappings_LeavesUnresolvedPjprojectTargetUnknown()
+    {
+        using var repository = CreateRepository(
+            "class Account { public void create() { pjsua2PINVOKE.Account_create(); } }",
+            "[DllImport(\"pjsua2\", EntryPoint=\"CSharp_libpjsua2fmaui_Account_create___\")] internal static extern void Account_create();",
+            "void CSharp_libpjsua2fmaui_Account_create___(void *jarg1) { pj::MissingType *arg1 = 0; (arg1)->create(); }",
+            "namespace pj { class Other { }; }",
+            "void Other::other() { }");
+        var relationships = new SourceInspection().InspectRepositoryMappings(CreateAcquisition(repository.RootPath), new Dictionary<string, string>
+        {
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs"] = repository.Managed,
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs"] = repository.PInvoke,
+            ["src/Platforms/Windows/cpp/pjsua2_wrap.cpp"] = repository.Wrapper
+        }, repository.Descriptor);
+
+        var unresolved = Assert.Single(relationships, item => item.RelationshipType == "native-wrapper-to-pjproject");
+        Assert.Equal(KnowledgeFactStatus.Unknown, unresolved.Status);
+        Assert.Equal(KnowledgeNodeResolution.Unknown, unresolved.TargetNode.Resolution);
+        Assert.Null(unresolved.TargetNode.Identifier);
+    }
+
+    [Fact]
+    public void InspectRepositoryMappingsPreservesMissingInteropAndDeclarationOnlyStates()
+    {
+        using var repository = CreateRepository(
+            "class Account { public void create() { pjsua2PINVOKE.Account_create(); } }",
+            "",
+            "",
+            "namespace pj { class Account { public: void create(); }; }",
+            "");
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs"] = repository.Managed,
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs"] = repository.PInvoke,
+            ["src/Platforms/Windows/cpp/pjsua2_wrap.cpp"] = repository.Wrapper
+        };
+
+        var missing = new SourceInspection().InspectRepositoryMappings(CreateAcquisition(repository.RootPath), sources, repository.Descriptor);
+        Assert.Contains(missing, item => item.RelationshipType == "swig-call-to-pinvoke" && item.Status == KnowledgeFactStatus.Unknown);
+
+        var declarationOnly = CreateRepository(
+            "class Account { public void create() { pjsua2PINVOKE.Account_create(); } }",
+            "[DllImport(\"pjsua2\", EntryPoint=\"CSharp_libpjsua2fmaui_Account_create___\")] internal static extern void Account_create();",
+            "void CSharp_libpjsua2fmaui_Account_create___(void *jarg1) { pj::Account *arg1 = 0; (arg1)->create(); }",
+            "namespace pj { class Account { public: void create(); }; }",
+            "");
+        var partial = new SourceInspection().InspectRepositoryMappings(CreateAcquisition(declarationOnly.RootPath), new Dictionary<string, string>
+        {
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs"] = declarationOnly.Managed,
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs"] = declarationOnly.PInvoke,
+            ["src/Platforms/Windows/cpp/pjsua2_wrap.cpp"] = declarationOnly.Wrapper
+        }, declarationOnly.Descriptor);
+        Assert.Contains(partial, item => item.RelationshipType == "native-wrapper-to-pjproject-declaration" && item.Status == KnowledgeFactStatus.Partial);
+        declarationOnly.Dispose();
+    }
+
+    [Fact]
+    public void InspectRepositoryMappings_ReadsPinnedProducerSources()
+    {
+        var producerRoot = System.IO.Path.Combine(FindRepositoryRoot(), "lib");
+        var pjRoot = System.IO.Path.Combine(producerRoot, "lib", "pjproject");
+        Assert.True(File.Exists(System.IO.Path.Combine(producerRoot, "src", "libpjsua2maui", "Platforms", "Windows", "pjsua2maui", "pjsua2", "Account.cs")));
+        Assert.True(File.Exists(System.IO.Path.Combine(pjRoot, "pjsip", "src", "pjsua2", "account.cpp")));
+
+        var platformRoot = System.IO.Path.Combine(producerRoot, "src", "libpjsua2maui", "Platforms", "Windows");
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs"] = File.ReadAllText(System.IO.Path.Combine(platformRoot, "pjsua2maui", "pjsua2", "Account.cs")),
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs"] = File.ReadAllText(System.IO.Path.Combine(platformRoot, "pjsua2maui", "pjsua2", "pjsua2PINVOKE.cs")),
+            ["src/Platforms/Windows/cpp/pjsua2_wrap.cpp"] = File.ReadAllText(System.IO.Path.Combine(platformRoot, "cpp", "pjsua2_wrap.cpp"))
+        };
+        var package = new PackageIdentity("libpjsua2maui");
+        var version = PackageVersion.Parse("2.17.0.5");
+        var identity = new KnowledgeSetIdentity(package, version);
+        var acquisition = new PackageAcquisitionResult("C:/fixture.nupkg", new KnowledgeManifest(identity, status: KnowledgeManifestStatus.Validated), new PackageDocumentationValidation(version, new Dictionary<string, string>(), [], []));
+        var descriptor = new SourceRepositoryDescriptor(producerRoot, "https://github.com/remotecodehub/libpjsua2maui.git", "7dfdd229f944b5f236b27cc19cdc97c3cf717567", "v2.17.0.5", pjRoot, "https://github.com/pjsip/pjproject.git", "5a457451fa2712ba18e12b01738e8ff3af2b26fd");
+
+        var relationships = new SourceInspection().InspectRepositoryMappings(acquisition, sources, descriptor);
+
+        Assert.Contains(relationships, item => item.RelationshipType == "managed-member-to-swig-call" && item.Source.Contains("Account.cs", StringComparison.Ordinal));
+        Assert.Contains(relationships, item => item.RelationshipType == "pinvoke-to-native-wrapper" && item.Status == KnowledgeFactStatus.Established);
+        Assert.Contains(relationships, item => item.RelationshipType == "native-wrapper-to-pjproject-declaration" && item.Status == KnowledgeFactStatus.Established && item.Provenance!.Revision == descriptor.Revision);
+        Assert.Contains(relationships, item => item.RelationshipType == "pjproject-declaration-to-implementation" && item.Target!.Contains("account.cpp", StringComparison.Ordinal));
+    }
+
     private static (PackageAcquisitionResult Acquisition, PackageArtifact Artifact) CreateFixture(string path, ArtifactKind kind)
     {
         var package = new PackageIdentity("libpjsua2maui");
@@ -97,5 +226,59 @@ public sealed class SourceInspectionTests
         var manifest = new KnowledgeManifest(identity, artifacts: [artifact], status: KnowledgeManifestStatus.Validated);
         var acquisition = new PackageAcquisitionResult("C:/fixture.nupkg", manifest, new PackageDocumentationValidation(version, new Dictionary<string, string>(), [], []));
         return (acquisition, artifact);
+    }
+
+    private static PackageAcquisitionResult CreateAcquisition(string path)
+    {
+        var package = new PackageIdentity("libpjsua2maui");
+        var version = PackageVersion.Parse("2.17.0.5");
+        var identity = new KnowledgeSetIdentity(package, version);
+        return new PackageAcquisitionResult(path, new KnowledgeManifest(identity, status: KnowledgeManifestStatus.Validated), new PackageDocumentationValidation(version, new Dictionary<string, string>(), [], []));
+    }
+
+    private static RepositoryFixture CreateRepository(string managed, string pinvoke, string wrapper, string header, string implementation)
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"libpjsua2maui-source-{Guid.NewGuid():N}");
+        var pj = Path.Combine(root, "pjproject");
+        Directory.CreateDirectory(Path.Combine(pj, "pjsip", "include", "pjsua2"));
+        Directory.CreateDirectory(Path.Combine(pj, "pjsip", "src", "pjsua2"));
+        File.WriteAllText(Path.Combine(pj, "pjsip", "include", "pjsua2", "account.hpp"), header);
+        File.WriteAllText(Path.Combine(pj, "pjsip", "src", "pjsua2", "account.cpp"), implementation);
+        return new RepositoryFixture(root, pj, managed, pinvoke, wrapper, new SourceRepositoryDescriptor(root, "https://example.test/libpjsua2maui.git", "producer-revision", "v2.17.0.5", pj, "https://example.test/pjproject.git", "pjproject-revision"));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            if (Directory.Exists(System.IO.Path.Combine(current.FullName, "lib", "lib", "pjproject"))) return current.FullName;
+            current = current.Parent;
+        }
+
+        return AppContext.BaseDirectory;
+    }
+
+    private sealed class RepositoryFixture : IDisposable
+    {
+        public RepositoryFixture(string path, string pjPath, string managed, string pinvoke, string wrapper, SourceRepositoryDescriptor descriptor)
+        {
+            RootPath = path;
+            Managed = managed;
+            PInvoke = pinvoke;
+            Wrapper = wrapper;
+            Descriptor = descriptor;
+        }
+
+        public string RootPath { get; }
+        public string Managed { get; }
+        public string PInvoke { get; }
+        public string Wrapper { get; }
+        public SourceRepositoryDescriptor Descriptor { get; }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(RootPath)) Directory.Delete(RootPath, recursive: true);
+        }
     }
 }

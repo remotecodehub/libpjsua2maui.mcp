@@ -77,7 +77,7 @@ public sealed class KnowledgeIndexer : IKnowledgeIndexer
         var platformEvidence = SortAndValidate(
             extraction.PlatformEvidence,
             evidence => $"{evidence.Subject}|{evidence.Platform}|{evidence.TargetFramework}|{evidence.RuntimeIdentifier}",
-            evidence => $"{evidence.KnowledgeSet}|{evidence.Subject}|{evidence.Platform}|{evidence.TargetFramework}|{evidence.RuntimeIdentifier}|{evidence.ManagedAssembly}|{evidence.NativeArtifact}|{evidence.Confidence}|{evidence.Provenance}|{evidence.Limitations}",
+            evidence => $"{evidence.KnowledgeSet}|{evidence.Subject}|{evidence.Platform}|{evidence.TargetFramework}|{evidence.RuntimeIdentifier}|{evidence.ManagedAssembly}|{evidence.NativeArtifact}|{evidence.ManagedSource}|{evidence.NativeSource}|{evidence.NativeHeader}|{evidence.Runtime}|{string.Join(';', evidence.ArtifactPaths)}|{evidence.Confidence}|{evidence.Provenance}|{evidence.Limitations}",
             "platform evidence");
 
         return Task.FromResult(new IndexedKnowledgeSet(manifest, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence));

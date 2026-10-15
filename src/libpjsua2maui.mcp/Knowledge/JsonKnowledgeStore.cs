@@ -285,6 +285,11 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         public string? RuntimeIdentifier { get; set; }
         public string? ManagedAssembly { get; set; }
         public string? NativeArtifact { get; set; }
+        public string? ManagedSource { get; set; }
+        public string? NativeSource { get; set; }
+        public string? NativeHeader { get; set; }
+        public string? Runtime { get; set; }
+        public string[]? ArtifactPaths { get; set; }
         public string? Confidence { get; set; }
         public string? Limitations { get; set; }
         public ProvenanceDto? Provenance { get; set; }
@@ -292,12 +297,14 @@ public sealed class JsonKnowledgeStore : IKnowledgeStore
         {
             Subject = NodeDto.From(x.Subject), Platform = x.Platform.ToString(), TargetFramework = x.TargetFramework,
             RuntimeIdentifier = x.RuntimeIdentifier, ManagedAssembly = x.ManagedAssembly.ToString(), NativeArtifact = x.NativeArtifact.ToString(),
+            ManagedSource = x.ManagedSource.ToString(), NativeSource = x.NativeSource.ToString(), NativeHeader = x.NativeHeader.ToString(), Runtime = x.Runtime.ToString(), ArtifactPaths = x.ArtifactPaths.ToArray(),
             Confidence = x.Confidence.ToString(), Limitations = x.Limitations, Provenance = ProvenanceDto.From(x.Provenance)
         };
         public PlatformEvidence ToModel(KnowledgeSetIdentity identity)
         {
             if (Subject is null || !TryParseEnum(Platform, out KnowledgePlatform platform) || !TryParseEnum(ManagedAssembly, out PlatformArtifactStatus managed) || !TryParseEnum(NativeArtifact, out PlatformArtifactStatus native) || !TryParseEnum(Confidence, out KnowledgeConfidence confidence)) throw new InvalidDataException("Invalid platform evidence.");
-            return new PlatformEvidence(identity, Subject.ToModel(), platform, TargetFramework, RuntimeIdentifier, managed, native, confidence, Provenance?.ToModel(identity), Limitations);
+            if (!TryParseEnum(ManagedSource ?? PlatformArtifactStatus.Unknown.ToString(), out PlatformArtifactStatus managedSource) || !TryParseEnum(NativeSource ?? PlatformArtifactStatus.Unknown.ToString(), out PlatformArtifactStatus nativeSource) || !TryParseEnum(NativeHeader ?? PlatformArtifactStatus.Unknown.ToString(), out PlatformArtifactStatus nativeHeader) || !TryParseEnum(Runtime ?? PlatformRuntimeStatus.NotValidated.ToString(), out PlatformRuntimeStatus runtime)) throw new InvalidDataException("Invalid platform source or runtime evidence.");
+            return new PlatformEvidence(identity, Subject.ToModel(), platform, TargetFramework, RuntimeIdentifier, managed, native, confidence, Provenance?.ToModel(identity), Limitations, managedSource, nativeSource, nativeHeader, runtime, ArtifactPaths);
         }
     }
 

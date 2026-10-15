@@ -89,7 +89,7 @@ Not every node will exist for every symbol; partial mappings are valid.
 
 The Phase 2 model represents these nodes with `KnowledgeNodeReference`. Identified symbols carry a node kind and identifier; textual references are explicitly marked as such, and an unknown endpoint has no fabricated identifier. `KnowledgeRelationship` carries the relationship type, status, both node references, and existing `FactProvenance`. `LifecycleFact` uses the same identity and provenance contract for ownership, native handles, disposal/destruction, callbacks, dependencies, initialization/shutdown order, threading limits, and use-after-disposal risks. These records are persisted in the existing JSON schema shape with optional new fields, so older schema-1 documents without lifecycle facts remain readable.
 
-For the inspected `libpjsua2maui` `v2.17.0.5` producer commit `7dfdd229f944b5f236b27cc19cdc97c3cf717567`, generated `Account.cs` demonstrates SWIG `4.5.1`, `HandleRef`, `swigCMemOwn`, finalization, `Dispose`, `delete_Account`, director connection, delegates, and callback forwarding. The package also publishes `src/Platforms/<platform>/cpp/pjsua2_wrap.cpp`, `pjsua2_wrap.h`, generated C# files, `pjsua2PINVOKE.cs`, and `SWIGTYPE_*` files. The producer repository links `lib/pjproject` at revision `5a457451fa2712ba18e12b01738e8ff3af2b26fd`. These are separate package and repository provenance facts; the MCP preserves partial/unknown status where the package does not contain pjproject implementation sources.
+For the inspected `libpjsua2maui` `v2.17.0.5` producer commit `7dfdd229f944b5f236b27cc19cdc97c3cf717567`, generated `Account.cs` demonstrates SWIG `4.5.1`, `HandleRef`, `swigCMemOwn`, finalization, `Dispose`, `delete_Account`, director connection, delegates, and callback forwarding. The package also publishes `src/Platforms/<platform>/cpp/pjsua2_wrap.cpp`, `pjsua2_wrap.h`, generated C# files, `pjsua2PINVOKE.cs`, and `SWIGTYPE_*` files. The producer repository links `lib/pjproject` at revision `5a457451fa2712ba18e12b01738e8ff3af2b26fd`. These are separate package and repository provenance facts; the MCP resolves declarations and implementations from that checkout when a `SourceRepositoryDescriptor` is supplied and preserves partial/unknown status for genuinely unresolved links.
 
 ## Platform metadata
 
@@ -115,7 +115,7 @@ Loading an existing artifact is offline and has no dependency on `IPackageAcquir
 
 Documentation content is persisted as the complete XML inner content represented by `DocumentationRecord`. A `<summary>` element is not required. Empty named records and valid records without a unique symbol association remain in the documentation or unassociated collections.
 
-The current persistence model carries the existing relationship shape for future indexed relationship data, but this check does not add or infer provenance. Managed-to-native evidence remains part of the separate provenance roadmap check.
+The persistence model carries managed-to-SWIG, native and platform evidence with their status, confidence and provenance. Repository mappings are enabled by constructing `PackageKnowledgeExtractor` with a `SourceRepositoryDescriptor`; package-only extraction remains conservative and preserves unresolved endpoints instead of guessing them.
 
 ## Offline mode
 

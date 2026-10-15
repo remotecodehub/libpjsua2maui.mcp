@@ -13,7 +13,12 @@ public sealed record PlatformEvidence
         PlatformArtifactStatus nativeArtifact,
         KnowledgeConfidence confidence,
         FactProvenance? provenance = null,
-        string? limitations = null)
+        string? limitations = null,
+        PlatformArtifactStatus managedSource = PlatformArtifactStatus.Unknown,
+        PlatformArtifactStatus nativeSource = PlatformArtifactStatus.Unknown,
+        PlatformArtifactStatus nativeHeader = PlatformArtifactStatus.Unknown,
+        PlatformRuntimeStatus runtime = PlatformRuntimeStatus.NotValidated,
+        IReadOnlyList<string>? artifactPaths = null)
     {
         KnowledgeSet = knowledgeSet ?? throw new ArgumentNullException(nameof(knowledgeSet));
         Subject = subject ?? throw new ArgumentNullException(nameof(subject));
@@ -22,6 +27,11 @@ public sealed record PlatformEvidence
         RuntimeIdentifier = Optional(runtimeIdentifier, nameof(runtimeIdentifier));
         ManagedAssembly = managedAssembly;
         NativeArtifact = nativeArtifact;
+        ManagedSource = managedSource;
+        NativeSource = nativeSource;
+        NativeHeader = nativeHeader;
+        Runtime = runtime;
+        ArtifactPaths = Array.AsReadOnly((artifactPaths ?? []).Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray());
         Confidence = confidence;
         Provenance = provenance;
         Limitations = Optional(limitations, nameof(limitations));
@@ -39,6 +49,11 @@ public sealed record PlatformEvidence
     public string? RuntimeIdentifier { get; }
     public PlatformArtifactStatus ManagedAssembly { get; }
     public PlatformArtifactStatus NativeArtifact { get; }
+    public PlatformArtifactStatus ManagedSource { get; }
+    public PlatformArtifactStatus NativeSource { get; }
+    public PlatformArtifactStatus NativeHeader { get; }
+    public PlatformRuntimeStatus Runtime { get; }
+    public IReadOnlyList<string> ArtifactPaths { get; }
     public KnowledgeConfidence Confidence { get; }
     public FactProvenance? Provenance { get; }
     public string? Limitations { get; }

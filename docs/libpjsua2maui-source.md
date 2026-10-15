@@ -35,6 +35,8 @@ Use both sources when analyzing the package, while preserving their distinct rol
 
 The source repository's `.github/workflows/ci-cd.yml` describes the native dependency/build and SWIG-generation stages, followed by packaging with `dotnet pack`; release-tag runs publish the resulting package. Use the workflow as production/provenance evidence, not as a substitute for inspecting the resulting `.nupkg`.
 
+The Core mapping pipeline accepts a `SourceRepositoryDescriptor` for this checked-out producer and nested pjproject revision. When supplied to `PackageKnowledgeExtractor`, it correlates direct generated C# calls with exact `pjsua2PINVOKE` declarations, wrapper definitions, pjproject declarations and implementations. Repository relationships carry the producer repository, tag/revision and pjproject revision. Package-only extraction does not invent repository mappings; it retains unresolved endpoints as `Partial` or `Unknown`.
+
 ## Rules for package analysis
 
 - Query the exact package version `2.17.0.5` for Phase 2 source inspection; never silently switch to the latest version.
