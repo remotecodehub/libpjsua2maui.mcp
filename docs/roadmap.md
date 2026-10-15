@@ -42,11 +42,48 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ## Phase 2 — SWIG/pjproject mapping
 
+### Phase 2A — Evidence universe and exhaustive inventory
+
 - [x] Inspect generated SWIG artifacts available from the package/repository. Baseline `2.17.0.5` publishes generated C#, C++ and headers; the producer tag and pjproject gitlink are recorded separately.
-- [x] Model managed-to-SWIG relationships. Direct generated C# calls are correlated to exact `pjsua2PINVOKE` declarations, P/Invoke entry points and generated wrapper definitions; unresolved calls retain explicit `Partial`/`Unknown` status.
-- [x] Model native pjproject mappings where evidence exists. The configured producer/pjproject source descriptor resolves wrapper calls to declarations and implementations when present, with repository revision provenance and conservative unresolved states.
-- [x] Model ownership, callbacks, disposal, handles, and lifecycle semantics. Generated source inspection records `HandleRef`, `swigCMemOwn`, `Dispose`, finalizers, `delete_*` and director/delegate evidence with provenance.
-- [x] Add platform-specific evidence and confidence. Android, iOS, MacCatalyst and Windows records include TFM, source/wrapper/header/native artifact paths, confidence, provenance and explicit `NotValidated` runtime status; static inspection does not claim runtime execution.
+- [ ] Establish the complete deterministic package symbol universe and immutable denominators for all relevant types and members.
+- [ ] Inventory classes, records, structs, enums, delegates, interfaces and other relevant metadata symbols with origin/provenance.
+- [ ] Inventory relevant constructors, properties, fields, methods, events, operators, static members and inherited/publicly exposed members.
+- [ ] Correlate package metadata, XML documentation, TFM/platform evidence and generated source into one deterministic inventory without double-counting.
+- [ ] Add an explicit inspection status for every inventory item (`NotInspected`, `Inspected`, `Mapped`, `Partial`, `Unknown`, `NotApplicable`, `Unparsed` or equivalent deterministic states).
+- [ ] Add deterministic inventory counters and an evidence-closure report that can prove whether every relevant package symbol was considered.
+
+### Phase 2B — Exhaustive managed-to-SWIG mapping
+
+- [ ] Correlate every applicable managed type and member, not only representative types such as `Account`, `Endpoint` and `Call`.
+- [ ] Classify type origin so managed-only/generated/helper/opaque/enum/delegate/native-backed types are not incorrectly forced through the same C# → SWIG → P/Invoke → wrapper chain.
+- [ ] Resolve direct generated C# member calls to exact `pjsua2PINVOKE` declarations and P/Invoke entry points where source evidence exists.
+- [ ] Preserve overloads, generic/type information and exact generated entry-point names in relationships.
+- [ ] Replace bare `Unknown` outcomes with deterministic evidence-gap reasons and provenance.
+- [ ] Resolve parser limitations before declaring an evidence gap; retain `Unparsed` only when the source construct is genuinely unsupported and document the exact limitation.
+
+### Phase 2C — Exhaustive native mapping
+
+- [ ] Correlate every applicable P/Invoke declaration to generated wrapper definitions and wrapper invocations.
+- [ ] Resolve wrapper invocations to pjproject declarations and implementations when the producer/pjproject sources provide sufficient evidence.
+- [ ] Record the exact last proven edge for every `Partial` relationship and the missing next edge.
+- [ ] Distinguish missing source/artifact evidence from ambiguous or unsupported correlation instead of collapsing them into `Unknown`.
+- [ ] Add native binary linkage evidence where the available package artifacts can prove it; otherwise record an explicit evidence gap rather than inferring linkage.
+
+### Phase 2D — Lifecycle, ownership and behavioral evidence model
+
+- [ ] Model creation, ownership, native handles, `HandleRef`, `swigCMemOwn`, `Dispose`, finalizers and `delete_*` relationships per applicable type.
+- [ ] Model callback registration/unregistration, delegate retention, director evidence and callback-related lifetime relationships where statically demonstrable.
+- [ ] Identify parent/child ownership and thread-affinity/lifetime semantics only when supported by source/artifact evidence; do not infer runtime behavior from naming alone.
+- [ ] Represent runtime-only semantics separately from static evidence and keep runtime validation explicitly `NotValidated` until an actual runtime validation path exists.
+
+### Phase 2E — Evidence gate and completion criteria
+
+- [ ] Define concrete `EvidenceGapReason` categories covering missing generated source, missing managed call, missing P/Invoke declaration, missing wrapper definition/invocation, missing pjproject declaration/implementation, missing native binary evidence, unsupported source construct, ambiguous overload/native target, runtime-only behavior and insufficient artifacts.
+- [ ] Require provenance for every `Established`, `Partial`, `EvidenceGap`, `NotApplicable`, `Unparsed` and `NotValidated` result.
+- [ ] Add a Phase 2 evidence gate independent from automated test-code coverage: 100% relevant types classified, 100% relevant members classified, 100% applicable relationships given deterministic outcomes, and zero unexplained `Unknown`/`Unparsed` results.
+- [ ] Add deterministic validation that all `Partial`/evidence-gap outcomes identify the exact missing evidence and last proven relationship edge.
+- [ ] Update Phase 2 documentation with final denominators, coverage counters, unresolved evidence gaps and reproducible validation commands.
+- [ ] Mark Phase 2 complete only after the exhaustive inventory, mapping, evidence-gap classification and evidence gate pass; runtime behavior may remain `NotValidated` when explicitly documented.
 
 ## Phase 3 — MCP knowledge surface
 
