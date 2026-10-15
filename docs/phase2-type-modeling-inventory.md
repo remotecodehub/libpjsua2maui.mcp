@@ -40,12 +40,25 @@ The extractor exposes `PackageExtractionResult.SourceCoverage`; its denominators
 | --- | --- |
 | `ManagedTypesDiscovered` | generated C# type declarations matched |
 | `ManagedMembersDiscovered` | generated C# members matched by the source inspector |
+| `ManagedMembersApplicableToSwig` | members considered applicable to direct generated-binding inspection |
 | `ManagedMembersWithSwigCalls` | distinct managed source members containing a `pjsua2PINVOKE` call |
+| `ManagedMembersWithoutDirectSwigCall` | applicable members without a direct call; this is not proof of managed-only behavior |
 | `SwigCallsDiscovered` / `SwigCallsResolvedToPInvoke` | direct generated calls and exact declaration resolutions |
+| `SwigCallsWithoutPInvoke` | direct calls with no exact platform-local declaration |
 | `PInvokeDeclarationsDiscovered` / `PInvokeDeclarationsResolvedToWrapper` | exact `DllImport` declarations and matching C++ entry points |
 | `WrapperDefinitionsDiscovered` | generated C++ wrapper definitions |
 | `WrapperInvocationsDiscovered` / `WrapperInvocationsResolvedToPjprojectDeclaration` | supported instance/qualified pjproject calls and declaration resolutions |
 | `PjprojectDeclarationsResolvedToImplementation` | declaration calls with a matching pjproject implementation |
+
+For the local pinned-source focused validation, each of the four platform source sets produced the same deterministic
+managed-to-SWIG counters: 29 types, 50 members/applicable members, 31 members with direct calls, 19 applicable members
+without a direct call, 42 direct calls, 3,314 P/Invoke declarations, 3,308 declarations resolved to generated wrapper
+definitions, 3,308 wrapper definitions, 57 wrapper invocations, 41 invocations resolved to pjproject declarations,
+and 35 declaration/implementation resolutions. These are source-inspection denominators for one `Account`-focused
+platform source set, not a claim that the complete package universe has been exhaustively mapped. The four-platform
+aggregate for this focused set is 116 types, 200 applicable members, 168 members with calls, 76 without direct calls,
+168 calls, 13,256 P/Invoke declarations, 13,232 wrapper resolutions, 13,232 wrapper definitions, 228 wrapper
+invocations, 164 declaration resolutions, and 140 implementation resolutions.
 
 The repository inspector supports both generated instance calls such as `(arg1)->create()` and qualified calls such as `pj::Account::notify()`. It binds instance calls through the declared `pj::Type*`/`pj::Type&` receiver rather than using the last type token in the function body. `SourceInspectionDiagnostic` records constructions that are present but unparsed; these are implementation limitations and are not represented as ordinary evidence `Unknown` relationships.
 

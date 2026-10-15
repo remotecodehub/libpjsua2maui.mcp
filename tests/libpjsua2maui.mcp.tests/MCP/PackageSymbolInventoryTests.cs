@@ -32,9 +32,14 @@ public sealed class PackageSymbolInventoryTests
         var assembly = new PackageArtifact(package, version, "lib/net10.0/libpjsua2maui.dll", ArtifactKind.ManagedAssembly, "net10.0");
         var generated = new SymbolRepresentation(package, version, new SymbolIdentity("N.SWIGTYPE_p_void", SymbolKind.Class), "net10.0", assembly, declaringType: "N.SWIGTYPE_p_void");
         var pinvoke = new SymbolRepresentation(package, version, new SymbolIdentity("N.PINVOKEHelper", SymbolKind.Class), "net10.0", assembly, declaringType: "N.PINVOKEHelper");
+        var generatedSource = new PackageArtifact(package, version, "src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs", ArtifactKind.ManagedSource, "net10.0");
+        var wrapper = new SymbolRepresentation(package, version, new SymbolIdentity("N.Account", SymbolKind.Class), "net10.0", generatedSource, declaringType: "N.Account");
         var acquisition = new PackageAcquisitionResult("source.nupkg", new KnowledgeManifest(new KnowledgeSetIdentity(package, version), new Dictionary<string, string>(), [assembly], KnowledgeManifestStatus.Validated), new PackageDocumentationValidation(version, new Dictionary<string, string>(), [], []));
         var generatedInventory = PackageSymbolInventoryBuilder.Build(new PackageExtractionResult(acquisition, [generated, pinvoke], [], [], []));
-        Assert.Equal(SymbolOrigin.GeneratedHelper, generatedInventory.Items.Single(item => item.Symbol == generated).Origin);
+        Assert.Equal(SymbolOrigin.SwigOpaqueType, generatedInventory.Items.Single(item => item.Symbol == generated).Origin);
+        Assert.Equal(SymbolOrigin.GeneratedHelper, generatedInventory.Items.Single(item => item.Symbol == pinvoke).Origin);
+        var wrapperInventory = PackageSymbolInventoryBuilder.Build(new PackageExtractionResult(acquisition, [wrapper], [], [], []));
+        Assert.Equal(SymbolOrigin.SwigManagedWrapper, wrapperInventory.Items.Single().Origin);
     }
 
     [Fact]

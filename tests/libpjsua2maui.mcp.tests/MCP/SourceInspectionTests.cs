@@ -134,13 +134,17 @@ public sealed class SourceInspectionTests
         var relationships = detailed.Relationships;
 
         Assert.Contains(relationships, item => item.RelationshipType == "managed-member-to-swig-call" && item.Status == KnowledgeFactStatus.Established);
-        Assert.Contains(relationships, item => item.RelationshipType == "swig-call-to-pinvoke" && item.Status == KnowledgeFactStatus.Established);
+        var pinvoke = Assert.Single(relationships, item => item.RelationshipType == "swig-call-to-pinvoke" && item.Status == KnowledgeFactStatus.Established);
+        Assert.Contains("CSharp_libpjsua2fmaui_Account_create__SWIG_0___", pinvoke.TargetNode.Identifier, StringComparison.Ordinal);
+        Assert.Contains("library 'pjsua2'", pinvoke.Provenance!.Evidence, StringComparison.Ordinal);
         var wrapper = Assert.Single(relationships, item => item.RelationshipType == "pinvoke-to-native-wrapper");
         Assert.Equal(KnowledgeFactStatus.Established, wrapper.Status);
         var declaration = Assert.Single(relationships, item => item.RelationshipType == "native-wrapper-to-pjproject-declaration");
         Assert.Equal(KnowledgeFactStatus.Established, declaration.Status);
         Assert.Contains(relationships, item => item.RelationshipType == "pjproject-declaration-to-implementation" && item.Status == KnowledgeFactStatus.Established);
         Assert.Equal(1, detailed.Coverage.ManagedMembersWithSwigCalls);
+        Assert.Equal(1, detailed.Coverage.ManagedMembersApplicableToSwig);
+        Assert.Equal(0, detailed.Coverage.ManagedMembersWithoutDirectSwigCall);
         Assert.Equal(1, detailed.Coverage.SwigCallsResolvedToPInvoke);
         Assert.Equal(1, detailed.Coverage.PInvokeDeclarationsResolvedToWrapper);
         Assert.Equal(1, detailed.Coverage.WrapperInvocationsResolvedToPjprojectDeclaration);
@@ -192,6 +196,51 @@ public sealed class SourceInspectionTests
 
         Assert.Contains(relationships, item => item.Target?.Contains("Account.#ctor", StringComparison.Ordinal) == true && item.Status == KnowledgeFactStatus.Established);
         Assert.Contains(relationships, item => item.Target?.Contains("Account.#dtor", StringComparison.Ordinal) == true && item.Status == KnowledgeFactStatus.Established);
+    }
+
+    [Fact]
+    public void InspectRepositoryMappingsReportsConflictingExactPlatformPInvokeDeclarations()
+    {
+        using var repository = CreateRepository(
+            "class Account { public void create() { pjsua2PINVOKE.Account_create(); } }",
+            "[DllImport(\"pjsua2\", EntryPoint=\"Entry_A\")] internal static extern void Account_create();\n[DllImport(\"pjsua2\", EntryPoint=\"Entry_B\")] internal static extern void Account_create();\n[DllImport(\"pjsua2\")] internal static extern void Unannotated();",
+            "void CSharp_libpjsua2fmaui_Account_create___() { }",
+            "namespace pj { class Account { public: void create(); }; }",
+            "");
+
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs"] = repository.Managed,
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs"] = repository.PInvoke,
+            ["src/Platforms/Windows/cpp/pjsua2_wrap.cpp"] = repository.Wrapper
+        };
+
+        var relationships = new SourceInspection().InspectRepositoryMappings(CreateAcquisition(repository.RootPath), sources, repository.Descriptor);
+
+        Assert.Contains(relationships, item => item.RelationshipType == "swig-call-to-pinvoke" && item.Status == KnowledgeFactStatus.Conflicting);
+    }
+
+    [Fact]
+    public void InspectRepositoryMappingsReportsUndelimitedManagedCallAsUnparsed()
+    {
+        using var repository = CreateRepository(
+            "class Account { pjsua2PINVOKE.Account_create(); }",
+            "[DllImport(\"pjsua2\", EntryPoint=\"CSharp_libpjsua2fmaui_Account_create___\")] internal static extern void Account_create();",
+            "",
+            "namespace pj { class Account { public: void create(); }; }",
+            "");
+
+        var sources = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs"] = repository.Managed,
+            ["src/Platforms/Windows/pjsua2maui/pjsua2/pjsua2PINVOKE.cs"] = repository.PInvoke,
+            ["src/Platforms/Windows/cpp/pjsua2_wrap.cpp"] = repository.Wrapper
+        };
+
+        var detailed = new SourceInspection().InspectRepositoryMappingsDetailed(CreateAcquisition(repository.RootPath), sources, repository.Descriptor);
+
+        Assert.Contains(detailed.Diagnostics, diagnostic => diagnostic.Kind == SourceInspectionDiagnosticKind.Unparsed);
+        Assert.Contains(detailed.Relationships, item => item.RelationshipType == "managed-member-to-swig-call" && item.Status == KnowledgeFactStatus.Partial);
     }
 
     [Fact]

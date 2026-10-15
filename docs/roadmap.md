@@ -44,7 +44,7 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ### Phase 2A — Evidence universe and exhaustive inventory
 
-Phase 2A is complete. The deterministic inventory model, metadata classification, TFM evidence deduplication, XML/source correlation, counters, and focused tests passed the manual validation procedure outside the sandbox. Phase 2B--2E remain pending.
+Phase 2A is complete. The deterministic inventory model, metadata classification, TFM evidence deduplication, XML/source correlation, counters, and focused tests passed the manual validation procedure outside the sandbox. Phase 2B is implemented locally and awaits the user's manual CI validation; Phase 2C--2E remain pending.
 
 - [x] Inspect generated SWIG artifacts available from the package/repository. Baseline `2.17.0.5` publishes generated C#, C++ and headers; the producer tag and pjproject gitlink are recorded separately.
 - [x] Establish the complete deterministic package symbol universe and immutable denominators for all relevant types and members.
@@ -55,6 +55,8 @@ Phase 2A is complete. The deterministic inventory model, metadata classification
 - [x] Add deterministic inventory counters and an evidence-closure report that can prove whether every relevant package symbol was considered.
 
 ### Phase 2B — Exhaustive managed-to-SWIG mapping
+
+Status: `[~]` local implementation; remote/CI validation is intentionally not claimed.
 
 - [ ] Correlate every applicable managed type and member, not only representative types such as `Account`, `Endpoint` and `Call`.
 - [ ] Classify type origin so managed-only/generated/helper/opaque/enum/delegate/native-backed types are not incorrectly forced through the same C# → SWIG → P/Invoke → wrapper chain.

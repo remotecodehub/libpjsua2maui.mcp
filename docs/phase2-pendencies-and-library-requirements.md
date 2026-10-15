@@ -58,7 +58,7 @@ A pendência que permanece é **reprodutibilidade completa da geração**. A ins
 
 ### 3.2 Model managed-to-SWIG relationships
 
-**Estado: Implementado e validado para os elos demonstráveis.**
+**Estado: Implementado localmente para os elos demonstráveis; validação manual final do usuário/CI pendente.**
 
 O `SourceInspection` correlaciona, quando presentes e delimitáveis:
 
@@ -69,11 +69,11 @@ Managed C# member
     -> generated C++ wrapper
 ```
 
-O matching por nome de tipo é apenas auxiliar e não constitui prova. Overloads e entry points distintos permanecem separados. Quando o inspector não consegue demonstrar um elo, a relação é mantida como `Partial` ou `Unknown`.
+O matching por nome de tipo é apenas auxiliar e não constitui prova. A declaração P/Invoke mantém biblioteca, EntryPoint, método, caminho e plataforma da evidência; overloads e sufixos gerados permanecem separados. Quando o inspector não consegue demonstrar um elo, a relação é mantida como `Partial`, `Unknown` ou `Conflicting`, e limitações do parser são emitidas como `Unparsed`. A contagem de membros aplicáveis e não resolvidos é separada da contagem de relacionamentos.
 
 ### 3.3 Model native pjproject mappings
 
-**Estado: Implementado e validado para os elos demonstráveis.**
+**Estado: Fora do escopo de conclusão da Phase 2B; infraestrutura estrutural existente permanece sujeita à Phase 2C.**
 
 Para wrappers cujo corpo pode ser resolvido, a inspeção procura separadamente:
 
@@ -89,7 +89,7 @@ A ausência de uma declaração ou implementação resolvível não é convertid
 
 ### 3.4 Lifecycle, ownership, callbacks, handles e disposal
 
-**Estado: Implementado e validado para os fatos estruturais demonstráveis; sem evidência completa para todos os semânticos.**
+**Estado: Fora do escopo de conclusão da Phase 2B; facts estruturais existentes não concluem a Phase 2D.**
 
 O modelo agora associa lifecycle facts ao tipo/membro quando a evidência pode ser delimitada. Os wrappers SWIG fornecem evidência direta para construções como:
 

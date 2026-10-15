@@ -111,7 +111,9 @@ public static class PackageSymbolInventoryBuilder
     {
         SymbolKind.Enum => SymbolOrigin.SwigEnum,
         SymbolKind.Delegate => SymbolOrigin.SwigDelegate,
-        _ when symbol.DeclaringType.Contains("SWIG", StringComparison.OrdinalIgnoreCase) || symbol.DeclaringType.Contains("PINVOKE", StringComparison.OrdinalIgnoreCase) => SymbolOrigin.GeneratedHelper,
+        _ when symbol.DeclaringType.Contains("SWIGTYPE_", StringComparison.Ordinal) => SymbolOrigin.SwigOpaqueType,
+        _ when symbol.DeclaringType.Contains("PINVOKE", StringComparison.OrdinalIgnoreCase) => SymbolOrigin.GeneratedHelper,
+        _ when symbol.SourceArtifact?.RelativePath.Contains("/pjsua2/", StringComparison.OrdinalIgnoreCase) == true => SymbolOrigin.SwigManagedWrapper,
         _ => SymbolOrigin.UnknownOrigin
     };
 }
