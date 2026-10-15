@@ -54,7 +54,7 @@ Run commands from the repository root. First restore repository-local .NET tools
 dotnet tool restore
 ```
 
-The original project-level gate remains available:
+The project-level gate is retained for CI compatibility, but the preferred local validation flow is to execute the produced test module directly. Do not invoke the test targets from the project file for this local gate.
 
 ```powershell
 dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
@@ -66,14 +66,20 @@ If that MSBuild target cannot be invoked in the local environment, build and run
 dotnet test ./tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.exe
 ```
 
-Then run the executable-driven gate, which runs the built test executable, generates `Summary.txt` and `Summary.md`, prints all three coverage percentages, and enforces the configured threshold:
+Run the produced executable with `dotnet test`, passing the Microsoft.Testing.Platform and Coverlet arguments explicitly:
 
 ```powershell
-dotnet tool restore
-dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGateExecutable
+dotnet test ./tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.exe -- --report-trx --report-trx-filename test-results.trx --results-directory ./tests/libpjsua2maui.mcp.tests/TestResults/ManualGate --coverlet --coverlet-output-format cobertura
 ```
 
-The `QualityGateExecutable` target is an alternative validation path; it does not replace or weaken `QualityGate`. Both use `QualityGateThreshold` (90 by default) and require at least that percentage for line, branch, and method coverage. Reports are stored under `tests/libpjsua2maui.mcp.tests/TestResults/QualityGate/Report`. A missing/invalid report or test failure must fail the target. If the direct `dotnet test <executable>` invocation creates coverage output in a different location than expected, inspect the actual files and correct the target/output configuration rather than claiming success.
+Generate and inspect the summary directly from the Cobertura file:
+
+```powershell
+dotnet tool run reportgenerator -reports:'./tests/libpjsua2maui.mcp.tests/TestResults/ManualGate/coverage.cobertura.*.xml' -targetdir:'./tests/libpjsua2maui.mcp.tests/TestResults/ManualGate/Report' -reporttypes:'Html;HtmlSummary;MarkdownSummary;TextSummary' -classfilters:'+libpjsua2maui.mcp*;-Program'
+Get-Content ./tests/libpjsua2maui.mcp.tests/TestResults/ManualGate/Report/Summary.txt
+```
+
+The manually captured summary must contain line, branch, and method coverage of at least 90%. A missing/invalid report, a failed executable, or any metric below the threshold fails the local gate. The HTML report is written to `tests/libpjsua2maui.mcp.tests/TestResults/ManualGate/Report/index.html`.
 
 Do not reduce the threshold or exclude relevant production code to make the gate pass. Report the exact commands, exit codes, actual percentages, and report paths. A plain successful build or test run is not a substitute for coverage validation.
 
