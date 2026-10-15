@@ -23,20 +23,44 @@ public enum SymbolOrigin
     UnknownOrigin
 }
 
+public enum EvidenceAssociationStatus
+{
+    NotEvaluated,
+    Proven,
+    Missing,
+    Ambiguous
+}
+
 public sealed record InventoryEvidence
 {
-    public InventoryEvidence(string? targetFramework, string? assemblyPath, string? sourcePath, bool hasXmlDocumentation)
+    public InventoryEvidence(
+        string? targetFramework,
+        string? assemblyPath,
+        string? sourcePath,
+        bool hasXmlDocumentation,
+        EvidenceAssociationStatus sourceStatus = EvidenceAssociationStatus.NotEvaluated,
+        EvidenceAssociationStatus xmlStatus = EvidenceAssociationStatus.NotEvaluated,
+        string? evidenceReason = null,
+        FactProvenance? sourceProvenance = null)
     {
         TargetFramework = targetFramework;
         AssemblyPath = assemblyPath;
         SourcePath = sourcePath;
         HasXmlDocumentation = hasXmlDocumentation;
+        SourceStatus = sourceStatus;
+        XmlStatus = xmlStatus;
+        EvidenceReason = evidenceReason;
+        SourceProvenance = sourceProvenance;
     }
 
     public string? TargetFramework { get; }
     public string? AssemblyPath { get; }
     public string? SourcePath { get; }
     public bool HasXmlDocumentation { get; }
+    public EvidenceAssociationStatus SourceStatus { get; }
+    public EvidenceAssociationStatus XmlStatus { get; }
+    public string? EvidenceReason { get; }
+    public FactProvenance? SourceProvenance { get; }
 }
 
 public sealed record PackageInventoryItem
@@ -99,6 +123,10 @@ public sealed record InventoryCounters
     public int MembersWithoutSource { get; init; }
     public int TypesWithoutXmlDocumentation { get; init; }
     public int MembersWithoutXmlDocumentation { get; init; }
+    public int TotalTfmEvidence { get; init; }
+    public int SourceEvidenceItems { get; init; }
+    public int XmlEvidenceItems { get; init; }
+    public int CompleteTfmEvidenceItems { get; init; }
 }
 
 public sealed record InventoryCompletenessReport(InventoryCounters Counters)
@@ -106,6 +134,11 @@ public sealed record InventoryCompletenessReport(InventoryCounters Counters)
     public bool InventoryComplete => Counters.TotalTypes == Counters.TypesInspected && Counters.TotalMembers == Counters.MembersInspected;
     public decimal TypeInspectionPercentage => Percentage(Counters.TypesInspected, Counters.TotalTypes);
     public decimal MemberInspectionPercentage => Percentage(Counters.MembersInspected, Counters.TotalMembers);
+    public decimal? SourceEvidenceCoveragePercentage => EvidencePercentage(Counters.SourceEvidenceItems, Counters.TotalTfmEvidence);
+    public decimal? XmlDocumentationCoveragePercentage => EvidencePercentage(Counters.XmlEvidenceItems, Counters.TotalTfmEvidence);
+    public decimal? TfmEvidenceCompletenessPercentage => EvidencePercentage(Counters.CompleteTfmEvidenceItems, Counters.TotalTfmEvidence);
+    public bool DiscoveryDenominatorProven => false;
+    public decimal? DiscoveryCompletenessPercentage => null;
 
     public string ToText(PackageIdentity? package, PackageVersion? packageVersion, IReadOnlyList<string> targetFrameworks)
     {
@@ -121,10 +154,17 @@ public sealed record InventoryCompletenessReport(InventoryCounters Counters)
             $"Members without source: {Counters.MembersWithoutSource}",
             $"Types without XML documentation: {Counters.TypesWithoutXmlDocumentation}",
             $"Members without XML documentation: {Counters.MembersWithoutXmlDocumentation}",
+            $"Discovery completeness: not provable without an independent expected-universe denominator",
+            $"Inspection coverage: {TypeInspectionPercentage:0.##}% types; {MemberInspectionPercentage:0.##}% members",
+            $"Source evidence coverage: {FormatPercentage(SourceEvidenceCoveragePercentage)}",
+            $"XML documentation coverage: {FormatPercentage(XmlDocumentationCoveragePercentage)}",
+            $"TFM evidence completeness: {FormatPercentage(TfmEvidenceCompletenessPercentage)}",
             $"Inventory completeness: types {TypeInspectionPercentage:0.##}%; members {MemberInspectionPercentage:0.##}%");
     }
 
     private static decimal Percentage(int numerator, int denominator) => denominator == 0 ? 100m : numerator * 100m / denominator;
+    private static decimal? EvidencePercentage(int numerator, int denominator) => denominator == 0 ? null : Percentage(numerator, denominator);
+    private static string FormatPercentage(decimal? value) => value is null ? "not provable" : $"{value:0.##}%";
 }
 
 public sealed record PackageSymbolInventory
@@ -174,7 +214,11 @@ public sealed record PackageSymbolInventory
             TypesWithoutSource = types.Count(item => item.Evidence.All(evidence => evidence.SourcePath is null)),
             MembersWithoutSource = members.Count(item => item.Evidence.All(evidence => evidence.SourcePath is null)),
             TypesWithoutXmlDocumentation = types.Count(item => item.Evidence.All(evidence => !evidence.HasXmlDocumentation)),
-            MembersWithoutXmlDocumentation = members.Count(item => item.Evidence.All(evidence => !evidence.HasXmlDocumentation))
+            MembersWithoutXmlDocumentation = members.Count(item => item.Evidence.All(evidence => !evidence.HasXmlDocumentation)),
+            TotalTfmEvidence = items.Sum(item => item.Evidence.Count),
+            SourceEvidenceItems = items.Sum(item => item.Evidence.Count(evidence => evidence.SourceStatus == EvidenceAssociationStatus.Proven)),
+            XmlEvidenceItems = items.Sum(item => item.Evidence.Count(evidence => evidence.XmlStatus == EvidenceAssociationStatus.Proven)),
+            CompleteTfmEvidenceItems = items.Sum(item => item.Evidence.Count(evidence => evidence.SourceStatus == EvidenceAssociationStatus.Proven && evidence.XmlStatus == EvidenceAssociationStatus.Proven))
         };
     }
 

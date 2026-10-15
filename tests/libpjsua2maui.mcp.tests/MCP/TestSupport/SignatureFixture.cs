@@ -20,6 +20,10 @@ public delegate void SignatureFixtureDelegate(string value);
 
 public class SignatureFixture<T> : ISignatureFixture where T : class
 {
+    public sealed class Nested
+    {
+    }
+
     public const int Constant = 1;
     public event EventHandler? Changed;
     public string Name { get; set; } = string.Empty;
