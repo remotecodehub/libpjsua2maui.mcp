@@ -58,7 +58,7 @@ A pendência que permanece é **reprodutibilidade completa da geração**. A ins
 
 ### 3.2 Model managed-to-SWIG relationships
 
-**Estado: Implementado localmente para os elos demonstráveis; validação manual final do usuário/CI pendente.**
+**Estado: Implementado e validado no CI para os elos managed-to-SWIG demonstráveis.**
 
 O `SourceInspection` correlaciona, quando presentes e delimitáveis:
 
@@ -70,6 +70,8 @@ Managed C# member
 ```
 
 O matching por nome de tipo é apenas auxiliar e não constitui prova. A declaração P/Invoke mantém biblioteca, EntryPoint, método, caminho e plataforma da evidência; overloads e sufixos gerados permanecem separados. Quando o inspector não consegue demonstrar um elo, a relação é mantida como `Partial`, `Unknown` ou `Conflicting`, e limitações do parser são emitidas como `Unparsed`. A contagem de membros aplicáveis e não resolvidos é separada da contagem de relacionamentos.
+
+A execução manual local fora da sandbox e a validação CI foram concluídas com sucesso. O CI validou o gate configurado; as métricas de cobertura de testes continuam sendo distintas dos denominadores de mapeamento de fontes. A cobertura integral do pacote permanece limitada aos conjuntos de fontes efetivamente disponíveis e inspecionados.
 
 ### 3.3 Model native pjproject mappings
 

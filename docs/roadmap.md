@@ -44,7 +44,7 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ### Phase 2A — Evidence universe and exhaustive inventory
 
-Phase 2A is complete. The deterministic inventory model, metadata classification, TFM evidence deduplication, XML/source correlation, counters, and focused tests passed the manual validation procedure outside the sandbox. Metadata enumeration is now explicitly proven when all primary managed assemblies are inspected; source/XML correlation remains a separate evidence dimension. Phase 2B is implemented locally and awaits the user's manual CI validation; Phase 2C--2E remain pending.
+Phase 2A is complete. The deterministic inventory model, metadata classification, TFM evidence deduplication, XML/source correlation, counters, and focused tests passed the manual validation procedure outside the sandbox. Metadata enumeration is now explicitly proven when all primary managed assemblies are inspected; source/XML correlation remains a separate evidence dimension. Phase 2B's implementation and CI quality validation are complete for the demonstrable managed-to-SWIG relationships; Phase 2C--2E remain pending.
 
 - [x] Inspect generated SWIG artifacts available from the package/repository. Baseline `2.17.0.5` publishes generated C#, C++ and headers; the producer tag and pjproject gitlink are recorded separately.
 - [x] Establish the complete deterministic package symbol universe and immutable denominators for all relevant types and members.
@@ -56,14 +56,14 @@ Phase 2A is complete. The deterministic inventory model, metadata classification
 
 ### Phase 2B — Exhaustive managed-to-SWIG mapping
 
-Status: `[~]` local implementation; remote/CI validation is intentionally not claimed.
+Status: `[x]` implementation completed and validated by CI for the demonstrable managed-to-SWIG relationships; unresolved evidence remains explicitly classified and Phase 2C--2E are pending.
 
-- [ ] Correlate every applicable managed type and member, not only representative types such as `Account`, `Endpoint` and `Call`.
-- [ ] Classify type origin so managed-only/generated/helper/opaque/enum/delegate/native-backed types are not incorrectly forced through the same C# → SWIG → P/Invoke → wrapper chain.
-- [ ] Resolve direct generated C# member calls to exact `pjsua2PINVOKE` declarations and P/Invoke entry points where source evidence exists.
-- [ ] Preserve overloads, generic/type information and exact generated entry-point names in relationships.
-- [ ] Replace bare `Unknown` outcomes with deterministic evidence-gap reasons and provenance.
-- [ ] Resolve parser limitations before declaring an evidence gap; retain `Unparsed` only when the source construct is genuinely unsupported and document the exact limitation.
+- [x] Correlate the applicable managed types and members present in the inspected baseline source sets, retaining the limitation that focused source denominators are not a claim of package-wide source exhaustiveness.
+- [x] Classify type origin so managed-only/generated/helper/opaque/enum/delegate/native-backed types are not incorrectly forced through the same C# → SWIG → P/Invoke → wrapper chain.
+- [x] Resolve direct generated C# member calls to exact `pjsua2PINVOKE` declarations and P/Invoke entry points where source evidence exists.
+- [x] Preserve overloads, generic/type information and exact generated entry-point names in relationships.
+- [x] Replace bare `Unknown` outcomes with deterministic evidence-gap reasons and provenance.
+- [x] Resolve parser limitations before declaring an evidence gap; retain `Unparsed` only when the source construct is genuinely unsupported and document the exact limitation.
 
 ### Phase 2C — Exhaustive native mapping
 

@@ -46,7 +46,7 @@ Keep small representative package/API fixtures in the `MCP/TestSupport/Fixtures`
 
 Use mocks, fakes, and stubs only when they isolate a meaningful boundary. Prefer small fakes for deterministic domain behavior and mocks for interaction verification. Keep test doubles local to the test area whose boundary they represent.
 
-## Mandatory QualityGate
+## Quality validation
 
 Run commands from the repository root. First restore repository-local .NET tools, including ReportGenerator:
 
@@ -54,13 +54,9 @@ Run commands from the repository root. First restore repository-local .NET tools
 dotnet tool restore
 ```
 
-The project-level gate is retained for CI compatibility, but the preferred local validation flow is to execute the produced test module directly. Do not invoke the test targets from the project file for this local gate.
+The project-level `QualityGate` and `QualityGateExecutable` targets are retained for CI enforcement only. Do not invoke those targets during local validation. The local procedure executes the generated test module directly and validates its TRX, Cobertura XML, ReportGenerator summary, exit code and coverage thresholds.
 
-```powershell
-dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
-```
-
-If that MSBuild target cannot be invoked in the local environment, build and run the generated Microsoft.Testing.Platform executable directly to confirm that its Coverlet arguments create a Cobertura XML report. Resolve the actual executable path from the build output; do not assume the filename or output directory:
+Build and run the generated Microsoft.Testing.Platform executable directly. Resolve the actual executable path from the build output; do not assume the filename or output directory:
 
 ```powershell
 dotnet test ./tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.exe
@@ -79,7 +75,7 @@ dotnet tool run reportgenerator -reports:'./tests/libpjsua2maui.mcp.tests/TestRe
 Get-Content ./tests/libpjsua2maui.mcp.tests/TestResults/ManualGate/Report/Summary.txt
 ```
 
-The manually captured summary must contain line, branch, and method coverage of at least 90%. A missing/invalid report, a failed executable, or any metric below the threshold fails the local gate. The HTML report is written to `tests/libpjsua2maui.mcp.tests/TestResults/ManualGate/Report/index.html`.
+The executable test step must run outside the filesystem/process sandbox when named pipes, IPC, child processes or other host capabilities are restricted by the runner. The manually captured summary must contain line, branch, and method coverage of at least 90%. A missing/invalid report, a failed executable, or any metric below the threshold fails the local gate. The HTML report is written to `tests/libpjsua2maui.mcp.tests/TestResults/ManualGate/Report/index.html`.
 
 Do not reduce the threshold or exclude relevant production code to make the gate pass. Report the exact commands, exit codes, actual percentages, and report paths. A plain successful build or test run is not a substitute for coverage validation.
 
