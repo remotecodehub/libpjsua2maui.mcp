@@ -10,6 +10,9 @@ public enum ArtifactKind
     XmlDocumentation,
     PackageMetadata,
     SwigArtifact,
+    ManagedSource,
+    NativeSource,
+    NativeHeader,
     NativeLibrary,
     Other
 }

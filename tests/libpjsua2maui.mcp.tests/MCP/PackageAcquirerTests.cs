@@ -25,9 +25,9 @@ public sealed class PackageAcquirerTests
         var handler = new StubHandler(CreatePackage(("net10.0-android", true), ("net10.0-ios", true)));
         var acquirer = CreateAcquirer(directory.Path, handler);
 
-        var result = await acquirer.AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken);
+        var result = await acquirer.AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken);
 
-        Assert.Equal("2.17.0.4", result.Manifest.PackageVersion.Value);
+        Assert.Equal("2.17.0.5", result.Manifest.PackageVersion.Value);
         Assert.True(File.Exists(result.ArtifactPath));
         Assert.Equal(["net10.0-android", "net10.0-ios"], result.Documentation.DocumentedTfms);
         Assert.Empty(result.Documentation.MissingDocumentationTfms);
@@ -41,8 +41,8 @@ public sealed class PackageAcquirerTests
         var handler = new StubHandler(CreatePackage(("net10.0-android", true)));
         var acquirer = CreateAcquirer(directory.Path, handler);
 
-        var first = await acquirer.AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken);
-        var second = await acquirer.AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken);
+        var first = await acquirer.AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken);
+        var second = await acquirer.AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken);
 
         Assert.Equal(first.ArtifactPath, second.ArtifactPath);
         Assert.Equal(1, handler.RequestCount);
@@ -55,7 +55,7 @@ public sealed class PackageAcquirerTests
         var handler = new StubHandler(CreatePackage(("net10.0-android", false)));
         var acquirer = CreateAcquirer(directory.Path, handler);
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => acquirer.AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => acquirer.AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken));
 
         Assert.Empty(Directory.EnumerateFiles(directory.Path, "*.nupkg", SearchOption.AllDirectories));
         Assert.Empty(Directory.EnumerateFiles(directory.Path, "*.tmp", SearchOption.AllDirectories));
@@ -67,7 +67,7 @@ public sealed class PackageAcquirerTests
         using var directory = new TemporaryDirectory();
         var acquirer = CreateAcquirer(directory.Path, new StubHandler(Encoding.UTF8.GetBytes("not a zip")));
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => acquirer.AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => acquirer.AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -75,12 +75,12 @@ public sealed class PackageAcquirerTests
     {
         using var directory = new TemporaryDirectory();
         var handler = new StubHandler(CreatePackageWithXml("<doc><members><member name=\"M:Example.Call\"><returns>Result</returns></member></members></doc>"));
-        var result = await CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken);
+        var result = await CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken);
         Assert.True(result.Documentation.IsValid);
 
         using var malformedDirectory = new TemporaryDirectory();
         var malformed = new StubHandler(CreatePackageWithXml("<doc><members>"));
-        await Assert.ThrowsAsync<InvalidDataException>(() => CreateAcquirer(malformedDirectory.Path, malformed).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => CreateAcquirer(malformedDirectory.Path, malformed).AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class PackageAcquirerTests
     {
         using var directory = new TemporaryDirectory();
         var handler = new StubHandler(CreateAssetPackage());
-        var result = await CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken);
+        var result = await CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken);
 
         var artifacts = result.Manifest.Artifacts.OrderBy(artifact => artifact.RelativePath, StringComparer.Ordinal).ToArray();
         Assert.Equal(artifacts.Select(artifact => artifact.RelativePath).Distinct(StringComparer.OrdinalIgnoreCase).Count(), artifacts.Length);
@@ -103,6 +103,9 @@ public sealed class PackageAcquirerTests
         Assert.Contains(artifacts, artifact => artifact.RelativePath == "buildTransitive/libpjsua2maui.props" && artifact.Kind == ArtifactKind.PackageMetadata);
         Assert.Contains(artifacts, artifact => artifact.RelativePath == "build/pinvoke/generated.cs" && artifact.Kind == ArtifactKind.SwigArtifact);
         Assert.Contains(artifacts, artifact => artifact.RelativePath == "tools/Example.SWIG.data" && artifact.Kind == ArtifactKind.SwigArtifact);
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs" && artifact.Kind == ArtifactKind.ManagedSource);
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "src/Platforms/Windows/cpp/pjsua2_wrap.cpp" && artifact.Kind == ArtifactKind.NativeSource);
+        Assert.Contains(artifacts, artifact => artifact.RelativePath == "src/Platforms/Windows/cpp/pjsua2_wrap.h" && artifact.Kind == ArtifactKind.NativeHeader);
     }
 
     [Theory]
@@ -124,7 +127,7 @@ public sealed class PackageAcquirerTests
         using var directory = new TemporaryDirectory();
         var handler = new StatusHandler(HttpStatusCode.NotFound);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken));
 
         Assert.Empty(Directory.EnumerateFiles(directory.Path, "*.tmp", SearchOption.AllDirectories));
     }
@@ -137,14 +140,14 @@ public sealed class PackageAcquirerTests
         cancellation.Cancel();
         var handler = new StubHandler(CreatePackage(("net10.0-android", true)));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.4", cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.5", cancellation.Token));
         Assert.Equal(1, handler.RequestCount);
     }
 
     [Theory]
-    [InlineData("other", "2.17.0.4", "identity")]
-    [InlineData("libpjsua2maui", "2.17.0.5", "identity")]
-    [InlineData("libpjsua2maui", "2.17.0.4", "malformed")]
+    [InlineData("other", "2.17.0.5", "identity")]
+    [InlineData("libpjsua2maui", "2.17.0.6", "identity")]
+    [InlineData("libpjsua2maui", "2.17.0.5", "malformed")]
     public async Task AcquireAsync_RejectsManifestIdentityAndXmlVariants(string id, string version, string shape)
     {
         using var directory = new TemporaryDirectory();
@@ -153,7 +156,7 @@ public sealed class PackageAcquirerTests
             : $"<package><metadata><id>{id}</id><version>{version}</version></metadata></package>";
         var handler = new StubHandler(CreateCustomPackage(manifest, ("lib/net10.0-android/libpjsua2maui.dll", "managed"), ("lib/net10.0-android/libpjsua2maui.xml", "<doc />")));
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => CreateAcquirer(directory.Path, handler).AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -161,12 +164,12 @@ public sealed class PackageAcquirerTests
     {
         using var directory = new TemporaryDirectory();
         var content = CreateCustomPackage(
-            "<package><metadata><id>libpjsua2maui</id><version>2.17.0.4</version></metadata></package>",
+            "<package><metadata><id>libpjsua2maui</id><version>2.17.0.5</version></metadata></package>",
             ("../bad.txt", "bad"),
             ("lib/net10.0-android/libpjsua2maui.dll", "managed"),
             ("lib/net10.0-android/libpjsua2maui.xml", "<doc />"));
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => CreateAcquirer(directory.Path, new StubHandler(content)).AcquireAsync("2.17.0.4", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidDataException>(() => CreateAcquirer(directory.Path, new StubHandler(content)).AcquireAsync("2.17.0.5", TestContext.Current.CancellationToken));
     }
 
     private static PackageAcquirer CreateAcquirer(string directory, HttpMessageHandler handler)
@@ -181,7 +184,7 @@ public sealed class PackageAcquirerTests
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
-            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.4</version></metadata></package>");
+            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.5</version></metadata></package>");
             foreach (var (tfm, hasXml) in tfms)
             {
                 AddEntry(archive, $"lib/{tfm}/libpjsua2maui.dll", "managed");
@@ -215,7 +218,7 @@ public sealed class PackageAcquirerTests
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
-            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.4</version></metadata></package>");
+            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.5</version></metadata></package>");
             AddEntry(archive, "lib/net10.0-android/libpjsua2maui.dll", "managed");
             AddEntry(archive, "lib/net10.0-android/libpjsua2maui.xml", "<doc />");
             AddEntry(archive, "ref/net10.0/libpjsua2maui.dll", "reference");
@@ -237,6 +240,9 @@ public sealed class PackageAcquirerTests
             AddEntry(archive, "tools/Example.SWIG.data", "swig");
             AddEntry(archive, "docs/readme.targets", "targets");
             AddEntry(archive, "README.md", "package notes");
+            AddEntry(archive, "src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs", "generated source");
+            AddEntry(archive, "src/Platforms/Windows/cpp/pjsua2_wrap.cpp", "native source");
+            AddEntry(archive, "src/Platforms/Windows/cpp/pjsua2_wrap.h", "native header");
         }
 
 
@@ -248,7 +254,7 @@ public sealed class PackageAcquirerTests
         using var stream = new MemoryStream();
         using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
         {
-            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.4</version></metadata></package>");
+            AddEntry(archive, "libpjsua2maui.nuspec", "<package><metadata><id>libpjsua2maui</id><version>2.17.0.5</version></metadata></package>");
             AddEntry(archive, "lib/net10.0-android/libpjsua2maui.dll", "managed");
             AddEntry(archive, "lib/net10.0-android/libpjsua2maui.xml", xml);
         }

@@ -24,7 +24,7 @@ Test package discovery, version identity, assembly/XML parsing, symbol indexing,
 
 Phase 2 tests also use deterministic synthetic enrichment records to verify typed managed/SWIG/native nodes, partial and unknown endpoints, lifecycle facts, conflict detection, version/set isolation, and JSON round-tripping. Repository evidence is represented in fixtures with repository provenance; it is not promoted to package provenance.
 
-The Phase 2 fixture suite executed 138 tests successfully in a direct Microsoft Testing Platform run and produced Cobertura reports. The repository quality targets still require an environment fix when launched as a child of MSBuild: this environment rejects the named-pipe handshake before test execution.
+The Phase 2 fixture suite executed 150 tests successfully in a direct Microsoft Testing Platform run and produced Cobertura reports. The repository quality targets still require an environment fix when launched as a child of MSBuild: this environment rejects the named-pipe handshake before test execution. The latest executable-driven gate measured 97.4% line, 90.4% branch, and 98.4% method coverage.
 
 ## MCP contract
 

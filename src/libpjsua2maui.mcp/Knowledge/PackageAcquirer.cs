@@ -169,6 +169,11 @@ public sealed class PackageAcquirer(HttpClient httpClient, PackageAcquisitionOpt
                 }
             }
 
+            if (kind == ArtifactKind.Other)
+            {
+                kind = ClassifySource(path);
+            }
+
             if (kind == ArtifactKind.Other && IsSwigPath(path))
             {
                 kind = ArtifactKind.SwigArtifact;
@@ -207,6 +212,22 @@ public sealed class PackageAcquirer(HttpClient httpClient, PackageAcquisitionOpt
         return path.Contains("swig", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".i", StringComparison.OrdinalIgnoreCase) ||
             path.Contains("pinvoke", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ArtifactKind ClassifySource(string path)
+    {
+        if (!path.StartsWith("src/", StringComparison.OrdinalIgnoreCase))
+        {
+            return ArtifactKind.Other;
+        }
+
+        return Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".cs" => ArtifactKind.ManagedSource,
+            ".cpp" => ArtifactKind.NativeSource,
+            ".h" or ".hpp" => ArtifactKind.NativeHeader,
+            _ => ArtifactKind.Other
+        };
     }
 
     private static bool IsPackageMetadataPath(string path)

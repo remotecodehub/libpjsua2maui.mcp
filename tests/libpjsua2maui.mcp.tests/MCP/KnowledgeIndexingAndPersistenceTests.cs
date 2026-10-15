@@ -66,8 +66,8 @@ public sealed class KnowledgeIndexingAndPersistenceTests
 
     [Theory]
     [InlineData("{\"schemaVersion\":1,\"packageId\":\"other\"}")]
-    [InlineData("{\"schemaVersion\":1,\"packageId\":\"libpjsua2maui\",\"packageVersion\":\"2.17.0.4\",\"manifestStatus\":\"1\"}")]
-    [InlineData("{\"schemaVersion\":1,\"packageId\":\"libpjsua2maui\",\"packageVersion\":\"2.17.0.4\",\"manifestStatus\":\"Indexed\",\"metadata\":{},\"artifacts\":[]}")]
+    [InlineData("{\"schemaVersion\":1,\"packageId\":\"libpjsua2maui\",\"packageVersion\":\"2.17.0.5\",\"manifestStatus\":\"1\"}")]
+    [InlineData("{\"schemaVersion\":1,\"packageId\":\"libpjsua2maui\",\"packageVersion\":\"2.17.0.5\",\"manifestStatus\":\"Indexed\",\"metadata\":{},\"artifacts\":[]}")]
     public async Task LoadAsync_RejectsInvalidManifestAndMissingCollections(string json)
     {
         await AssertLoadRejectsAsync(json, typeof(InvalidDataException));
@@ -108,7 +108,7 @@ public sealed class KnowledgeIndexingAndPersistenceTests
         {
           "schemaVersion": 1,
           "packageId": "libpjsua2maui",
-          "packageVersion": "2.17.0.4",
+          "packageVersion": "2.17.0.5",
           "manifestStatus": "Indexed",
           "metadata": {},
           "artifacts": [
@@ -128,7 +128,7 @@ public sealed class KnowledgeIndexingAndPersistenceTests
         {
           "schemaVersion": 1,
           "packageId": "libpjsua2maui",
-          "packageVersion": "2.17.0.4",
+          "packageVersion": "2.17.0.5",
           "manifestStatus": "Indexed",
           "metadata": {},
           "artifacts": [
@@ -177,7 +177,7 @@ public sealed class KnowledgeIndexingAndPersistenceTests
     public void PersistenceDtos_RejectInvalidReferencesAndPreserveOptionalShapes()
     {
         var package = new PackageIdentity("libpjsua2maui");
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(package, version, "dto");
         var assembly = new PackageArtifact(package, version, "lib/a.dll", ArtifactKind.ManagedAssembly, "net10.0");
         var xml = new PackageArtifact(package, version, "lib/a.xml", ArtifactKind.XmlDocumentation, "net10.0");
@@ -252,7 +252,7 @@ public sealed class KnowledgeIndexingAndPersistenceTests
     public void PersistenceDtos_TheoryRejectsInvalidShape(string scenario)
     {
         var package = new PackageIdentity("libpjsua2maui");
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(package, version);
         var assembly = new PackageArtifact(package, version, "lib/a.dll", ArtifactKind.ManagedAssembly, "net10.0");
         var xml = new PackageArtifact(package, version, "lib/a.xml", ArtifactKind.XmlDocumentation, "net10.0");
@@ -299,7 +299,7 @@ public sealed class KnowledgeIndexingAndPersistenceTests
             await new JsonKnowledgeStore().SaveAsync(path, indexed, TestContext.Current.CancellationToken);
             var loaded = await new JsonKnowledgeStore().LoadAsync(path, TestContext.Current.CancellationToken);
 
-            Assert.Equal("2.17.0.4", loaded.Manifest.PackageVersion.Value);
+            Assert.Equal("2.17.0.5", loaded.Manifest.PackageVersion.Value);
             Assert.Equal("review-1", loaded.Manifest.Identity.Revision);
             Assert.Equal(KnowledgeManifestStatus.Indexed, loaded.Manifest.Status);
             Assert.Equal(2, loaded.Symbols.Count);
@@ -361,7 +361,7 @@ public sealed class KnowledgeIndexingAndPersistenceTests
     private static PackageExtractionResult CreateExtraction(bool reverse = false)
     {
         var package = new PackageIdentity("libpjsua2maui");
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(package, version, "review-1");
         var androidAssembly = new PackageArtifact(package, version, "lib/net10.0-android/libpjsua2maui.dll", ArtifactKind.ManagedAssembly, "net10.0-android");
         var androidXml = new PackageArtifact(package, version, "lib/net10.0-android/libpjsua2maui.xml", ArtifactKind.XmlDocumentation, "net10.0-android");

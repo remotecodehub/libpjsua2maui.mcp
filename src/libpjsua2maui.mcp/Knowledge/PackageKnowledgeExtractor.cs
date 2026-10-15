@@ -16,10 +16,39 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         var symbols = new List<SymbolRepresentation>();
         var documentation = new List<DocumentationRecord>();
         var platformEvidence = new List<PlatformEvidence>();
+        var relationships = new List<KnowledgeRelationship>();
+        var lifecycleFacts = new List<LifecycleFact>();
+        var sourceInspections = new List<SourceInspectionResult>();
 
         await using var packageStream = new FileStream(acquisition.ArtifactPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
         using var archive = new System.IO.Compression.ZipArchive(packageStream, System.IO.Compression.ZipArchiveMode.Read);
         var entries = archive.Entries.ToDictionary(entry => entry.FullName.Replace('\\', '/'), StringComparer.OrdinalIgnoreCase);
+
+        var sourceInspector = new SourceInspection();
+        foreach (var sourceArtifact in acquisition.Manifest.Artifacts
+            .Where(a => a.Kind is ArtifactKind.ManagedSource or ArtifactKind.NativeSource or ArtifactKind.NativeHeader)
+            .OrderBy(a => a.RelativePath, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!entries.TryGetValue(sourceArtifact.RelativePath, out var sourceEntry))
+            {
+                continue;
+            }
+
+            try
+            {
+                using var reader = new StreamReader(sourceEntry.Open());
+                var content = await reader.ReadToEndAsync(cancellationToken);
+                var inspection = sourceInspector.Inspect(acquisition, sourceArtifact, content);
+                sourceInspections.Add(inspection);
+                relationships.AddRange(inspection.Relationships);
+                lifecycleFacts.AddRange(inspection.LifecycleFacts);
+            }
+            catch (Exception exception) when (exception is IOException or InvalidDataException)
+            {
+                throw new InvalidDataException($"Unable to inspect source artifact '{sourceArtifact.RelativePath}'.", exception);
+            }
+        }
 
         foreach (var assemblyArtifact in acquisition.Manifest.Artifacts
             .Where(a => a.Kind == ArtifactKind.ManagedAssembly && IsPrimaryLibAssembly(a))
@@ -99,7 +128,28 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
             }
         }
 
-        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated, platformEvidence: platformEvidence);
+        foreach (var inspection in sourceInspections.Where(item => item.Artifact.Kind == ArtifactKind.ManagedSource))
+        {
+            foreach (var sourceType in inspection.Symbols)
+            {
+                var managedSymbols = symbols.Where(symbol => (symbol.Identity.Kind is SymbolKind.Class or SymbolKind.Struct or SymbolKind.Enum or SymbolKind.Delegate) &&
+                    symbol.Identity.QualifiedName.EndsWith($".{sourceType}", StringComparison.Ordinal) &&
+                    string.Equals(symbol.TargetFramework, inspection.Artifact.TargetFramework, StringComparison.Ordinal));
+                foreach (var managedSymbol in managedSymbols)
+                {
+                    relationships.Add(new KnowledgeRelationship(
+                        acquisition.Manifest.Identity,
+                        "managed-to-swig",
+                        new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, managedSymbol.Identity.QualifiedName),
+                        new KnowledgeNodeReference(KnowledgeNodeKind.SwigSymbol, $"swig:{sourceType}"),
+                        KnowledgeFactStatus.Established,
+                        inspection.Provenance,
+                        KnowledgeConfidence.Confirmed));
+                }
+            }
+        }
+
+        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence);
     }
 
     private static bool IsPrimaryLibAssembly(PackageArtifact artifact)

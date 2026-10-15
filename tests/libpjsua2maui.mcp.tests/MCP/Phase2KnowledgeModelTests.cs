@@ -136,7 +136,7 @@ public sealed class Phase2KnowledgeModelTests
     private static PackageExtractionResult CreateExtraction()
     {
         var package = new PackageIdentity("libpjsua2maui");
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(package, version, "phase2");
         var assembly = new PackageArtifact(package, version, "lib/net10.0-android/libpjsua2maui.dll", ArtifactKind.ManagedAssembly, "net10.0-android");
         var manifest = new KnowledgeManifest(identity, artifacts: [assembly], status: KnowledgeManifestStatus.Validated);

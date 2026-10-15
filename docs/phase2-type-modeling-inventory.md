@@ -1,6 +1,6 @@
 # Phase 2 type-modeling coverage
 
-This inventory records what was actually examined for package `libpjsua2maui` `2.17.0.4` and library revision `03e4cf1194b810085447d0b1add34fbb5a9c8d58` (`v2.17.0.4`). Counts are denominator-labelled; they are not runtime compatibility claims.
+This inventory records the historical package `libpjsua2maui` `2.17.0.4` and the current source-inspection baseline `2.17.0.5`. Counts are denominator-labelled; they are not runtime compatibility claims. The current producer release commit is `7dfdd229f944b5f236b27cc19cdc97c3cf717567`, with pjproject gitlink `5a457451fa2712ba18e12b01738e8ff3af2b26fd`.
 
 ## Package coverage
 

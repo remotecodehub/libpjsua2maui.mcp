@@ -1,5 +1,9 @@
 # Phase 2 — Pendências de modelagem e requisitos do `libpjsua2maui`
 
+> Atualização de 15/10/2026: este relatório foi produzido contra a baseline histórica `2.17.0.4`. A baseline mínima atual para source inspection é `libpjsua2maui >= 2.17.0.5`; consulte `docs/package-knowledge.md` e `docs/libpjsua2maui-source.md` para o estado atualizado. As conclusões sobre ausência de fontes no pacote abaixo não se aplicam à `2.17.0.5`.
+
+> Estado da implementação: a versão `2.17.0.5` foi inspecionada e o extrator agora indexa os fontes C# gerados pelo SWIG, wrappers C++ e headers publicados. O produtor está fixado localmente em `7dfdd229f944b5f236b27cc19cdc97c3cf717567`, com pjproject em `5a457451fa2712ba18e12b01738e8ff3af2b26fd`. As pendências remanescentes são relações nativas que continuam parciais ou desconhecidas quando o pacote não contém a implementação pjproject correspondente; elas não devem ser tratadas como ausência de artefato.
+
 ## 1. Objetivo e escopo
 
 Este relatório registra o estado verificável da Phase 2 do MCP, as lacunas que ainda impedem o mapeamento completo dos modelos e os artefatos que precisam ser produzidos no repositório `remotecodehub/libpjsua2maui` para que a investigação seja reproduzível.
@@ -305,6 +309,6 @@ Não é necessário que todos os tipos tenham um destino pjproject conhecido qua
 
 ## 9. Conclusão
 
-As pendências principais não são apenas campos ausentes no MCP. A limitação determinante é a ausência, na revisão `v2.17.0.4` atualmente fixada, dos inputs SWIG, dos wrappers C++ efetivamente compilados e da revisão pjproject usada para produzir os binários.
+Na baseline atual, a limitação determinante deixou de ser a ausência dos fontes gerados no pacote. O MCP consegue registrar os artefatos publicados e as relações demonstráveis, mas ainda preserva como parciais ou desconhecidas as cadeias cujo destino pjproject não pode ser provado apenas pelo conteúdo distribuído. A investigação adicional deve usar o submódulo pjproject fixado e a implementação C++ correspondente, sem converter semelhança textual em mapeamento confirmado.
 
 O MCP já possui contratos para proveniência, confiança, plataforma, relações e lifecycle. Para finalizar a Phase 2 sem inventar mappings, o repositório `libpjsua2maui` precisa publicar os artefatos de geração e os manifestos versionados acima; o `.nupkg` precisa, no mínimo, carregar os manifestos específicos da versão junto dos assemblies e assets nativos. Até que isso ocorra, os checks 1 e parte do check 5 podem ser considerados inventariados, enquanto os checks 2, 3 e 4 permanecem parciais e a Phase 2 não deve ser declarada concluída.

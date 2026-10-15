@@ -2,7 +2,7 @@
 
 ## Supported package baseline
 
-The MCP requires `libpjsua2maui` version **2.17.0.4 or later** as its minimum supported package version. XML documentation comments are available in the published package starting with version `2.17.0.4`; versions below this baseline must not be treated as supported inputs for package knowledge indexing.
+The MCP requires `libpjsua2maui` version **2.17.0.5 or later** as its minimum supported package version. Version `2.17.0.5` is the first inspected release that publishes the generated C# sources, C++ wrapper sources and headers in the `.nupkg`, and is therefore the minimum baseline for source inspection and Phase 2 mapping. Versions below this baseline must not be treated as complete source-inspection inputs.
 
 The minimum-version requirement is part of the package ingestion contract and must be enforced when acquiring or indexing a package version.
 
@@ -59,7 +59,7 @@ The validation helper should expose enough information to report:
 - which TFMs are missing documentation;
 - the package version being validated.
 
-For the current supported package baseline (`2.17.0.4`), the published package is expected to provide one XML documentation file per supported MAUI TFM under `lib/`.
+For the current supported package baseline (`2.17.0.5`), the published package is expected to provide one XML documentation file per supported MAUI TFM under `lib/`, together with the source inventory under `src/`.
 
 ## Package assets, TFMs, RIDs, and native artifacts
 
@@ -89,7 +89,7 @@ Not every node will exist for every symbol; partial mappings are valid.
 
 The Phase 2 model represents these nodes with `KnowledgeNodeReference`. Identified symbols carry a node kind and identifier; textual references are explicitly marked as such, and an unknown endpoint has no fabricated identifier. `KnowledgeRelationship` carries the relationship type, status, both node references, and existing `FactProvenance`. `LifecycleFact` uses the same identity and provenance contract for ownership, native handles, disposal/destruction, callbacks, dependencies, initialization/shutdown order, threading limits, and use-after-disposal risks. These records are persisted in the existing JSON schema shape with optional new fields, so older schema-1 documents without lifecycle facts remain readable.
 
-For the inspected `libpjsua2maui` `origin/main` source at commit `f59260dc020ce9fddc8e914d1f6d274dd8042a5a`, generated `Account.cs` demonstrates `HandleRef`, `swigCMemOwn`, finalization, `Dispose`, `delete_Account`, director connection, delegates, and callback forwarding. The Makefile demonstrates SWIG generation from `pjsua2.i` and `symbols.i`. These remain repository/source-of-generation evidence, not package artifacts. The `2.17.0.4` package inventory contains no separately published SWIG interface or generated wrapper source, so package-only indexing does not claim exact managed-to-SWIG/native mappings.
+For the inspected `libpjsua2maui` `v2.17.0.5` producer commit `7dfdd229f944b5f236b27cc19cdc97c3cf717567`, generated `Account.cs` demonstrates SWIG `4.5.1`, `HandleRef`, `swigCMemOwn`, finalization, `Dispose`, `delete_Account`, director connection, delegates, and callback forwarding. The package also publishes `src/Platforms/<platform>/cpp/pjsua2_wrap.cpp`, `pjsua2_wrap.h`, generated C# files, `pjsua2PINVOKE.cs`, and `SWIGTYPE_*` files. The producer repository links `lib/pjproject` at revision `5a457451fa2712ba18e12b01738e8ff3af2b26fd`. These are separate package and repository provenance facts; the MCP preserves partial/unknown status where the package does not contain pjproject implementation sources.
 
 ## Platform metadata
 

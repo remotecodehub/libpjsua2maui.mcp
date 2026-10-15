@@ -42,11 +42,11 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ## Phase 2 — SWIG/pjproject mapping
 
-- [x] Inspect generated SWIG artifacts available from the package/repository.
-- [~] Model managed-to-SWIG relationships. Representative generated classes and PINVOKE calls are confirmed; full member-by-member correlation and native wrapper bodies remain unavailable.
-- [~] Model native pjproject mappings where evidence exists. PINVOKE entry points and the Makefile boundary are confirmed; the C++ wrapper and referenced interface inputs are unavailable, so pjproject endpoints remain partial/unknown.
-- [~] Model ownership, callbacks, disposal, handles, and lifecycle semantics. Class-specific generated-source facts are represented with provenance and limitations; broader type coverage remains incomplete.
-- [~] Add platform-specific evidence and confidence. Package-derived TFM/native-asset observations and separate confidence fields are implemented; runtime availability and exhaustive per-member platform coverage remain unverified.
+- [x] Inspect generated SWIG artifacts available from the package/repository. Baseline `2.17.0.5` publishes generated C#, C++ and headers; the producer tag and pjproject gitlink are recorded separately.
+- [~] Model managed-to-SWIG relationships. Source inspection now records generated types, `pjsua2PINVOKE` calls and P/Invoke entry points; exhaustive member-to-pjproject correlation remains partial where the package has no pjproject implementation source.
+- [~] Model native pjproject mappings where evidence exists. C++ wrapper symbols and pjproject includes are recorded as partial evidence; a complete native mapping requires matching declarations/implementations from the pinned pjproject checkout.
+- [x] Model ownership, callbacks, disposal, handles, and lifecycle semantics. Generated source inspection records `HandleRef`, `swigCMemOwn`, `Dispose`, finalizers, `delete_*` and director/delegate evidence with provenance.
+- [~] Add platform-specific evidence and confidence. Source and native artifacts are classified per package, but runtime availability and exhaustive per-member platform execution remain outside static inspection.
 
 ## Phase 3 — MCP knowledge surface
 

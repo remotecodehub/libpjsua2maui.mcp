@@ -10,10 +10,10 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void PackageVersion_AcceptsMinimumAndLaterVersionsWithNumericPrecedence()
     {
-        var minimum = PackageVersion.Parse("2.17.0.4");
+        var minimum = PackageVersion.Parse("2.17.0.5");
         var later = PackageVersion.Parse("2.17.0.10");
 
-        Assert.Equal("2.17.0.4", minimum.Value);
+        Assert.Equal("2.17.0.5", minimum.Value);
         Assert.True(later.CompareTo(minimum) > 0, $"later={later} minimum={minimum} comparison={later.CompareTo(minimum)}");
         Assert.True(PackageVersion.Parse("2.17.0.11-beta.1").CompareTo(later) > 0);
     }
@@ -34,12 +34,12 @@ public sealed class KnowledgeModelTests
 
     [Theory]
     [InlineData("not-a-version")]
-    [InlineData("2.17.0.4.1")]
+    [InlineData("2.17.0.5.1")]
     [InlineData("2.17.0.04")]
     [InlineData("2..17.0.4")]
-    [InlineData("2.17.0.4-")]
-    [InlineData("2.17.0.4-alpha_")]
-    [InlineData("+2.17.0.4")]
+    [InlineData("2.17.0.5-")]
+    [InlineData("2.17.0.5-alpha_")]
+    [InlineData("+2.17.0.5")]
     public void PackageVersion_RejectsMalformedValues(string value)
     {
         Assert.Throws<FormatException>(() => PackageVersion.Parse(value));
@@ -48,21 +48,21 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void PackageVersion_OrdersPrereleaseIdentifiersByNuGetRules()
     {
-        Assert.True(PackageVersion.Parse("2.17.0.5-alpha").CompareTo(PackageVersion.Parse("2.17.0.5-alpha.1")) < 0);
-        Assert.True(PackageVersion.Parse("2.17.0.5-alpha.1").CompareTo(PackageVersion.Parse("2.17.0.5-alpha.beta")) < 0);
-        Assert.True(PackageVersion.Parse("2.17.0.5-alpha.beta").CompareTo(PackageVersion.Parse("2.17.0.5-beta")) < 0);
-        Assert.Equal(1, PackageVersion.Parse("2.17.0.4").CompareTo(null));
-        Assert.True(PackageVersion.Parse("2.17.0.4").Equals(PackageVersion.Parse("2.17.0.4")));
-        Assert.False(PackageVersion.Parse("2.17.0.4").Equals(null));
-        Assert.True(PackageVersion.Parse("2.17.0.5-alpha.1").CompareTo(PackageVersion.Parse("2.17.0.5-alpha")) > 0);
+        Assert.True(PackageVersion.Parse("2.17.0.6-alpha").CompareTo(PackageVersion.Parse("2.17.0.6-alpha.1")) < 0);
+        Assert.True(PackageVersion.Parse("2.17.0.6-alpha.1").CompareTo(PackageVersion.Parse("2.17.0.6-alpha.beta")) < 0);
+        Assert.True(PackageVersion.Parse("2.17.0.6-alpha.beta").CompareTo(PackageVersion.Parse("2.17.0.6-beta")) < 0);
+        Assert.Equal(1, PackageVersion.Parse("2.17.0.5").CompareTo(null));
+        Assert.True(PackageVersion.Parse("2.17.0.5").Equals(PackageVersion.Parse("2.17.0.5")));
+        Assert.False(PackageVersion.Parse("2.17.0.5").Equals(null));
+        Assert.True(PackageVersion.Parse("2.17.0.6-alpha.1").CompareTo(PackageVersion.Parse("2.17.0.6-alpha")) > 0);
     }
 
     [Theory]
-    [InlineData("2.17.0.5-alpha", "2.17.0.5-alpha.1")]
-    [InlineData("2.17.0.5-alpha.1", "2.17.0.5-alpha.2")]
-    [InlineData("2.17.0.5-alpha.1", "2.17.0.5-alpha.10")]
-    [InlineData("2.17.0.5-alpha", "2.17.0.5")]
-    [InlineData("2.17.0.5-alpha", "2.17.0.5-beta")]
+    [InlineData("2.17.0.6-alpha", "2.17.0.6-alpha.1")]
+    [InlineData("2.17.0.6-alpha.1", "2.17.0.6-alpha.2")]
+    [InlineData("2.17.0.6-alpha.1", "2.17.0.6-alpha.10")]
+    [InlineData("2.17.0.6-alpha", "2.17.0.6")]
+    [InlineData("2.17.0.6-alpha", "2.17.0.6-beta")]
     [InlineData("2.17.0.5", "2.17.0.6")]
     public void PackageVersion_TheoryCoversPrereleaseAndNumericComparisonBranches(string lower, string higher)
     {
@@ -70,34 +70,34 @@ public sealed class KnowledgeModelTests
     }
 
     [Theory]
-    [InlineData("2.17.0.5-alpha.0")]
-    [InlineData("2.17.0.5-1")]
-    [InlineData("2.17.0.5-alpha-1")]
-    [InlineData("2.17.0.5-alpha.beta.1")]
+    [InlineData("2.17.0.6-alpha.0")]
+    [InlineData("2.17.0.6-1")]
+    [InlineData("2.17.0.6-alpha-1")]
+    [InlineData("2.17.0.6-alpha.beta.1")]
     public void PackageVersion_AcceptsValidIdentifierAndNormalizedReleaseShapes(string value)
     {
         var parsed = PackageVersion.Parse(value);
-        Assert.StartsWith("2.17.0.5", parsed.Value, StringComparison.Ordinal);
+        Assert.StartsWith("2.17.0.6", parsed.Value, StringComparison.Ordinal);
     }
 
     [Fact]
     public void KnowledgeSetIdentity_DistinguishesPackageVersionAndRebuildRevision()
     {
-        var first = new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.4"));
+        var first = new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.5"));
         var second = new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.10"));
-        var rebuild = new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.4"), "review-1");
+        var rebuild = new KnowledgeSetIdentity(Package, PackageVersion.Parse("2.17.0.5"), "review-1");
 
         Assert.NotEqual(first, second);
         Assert.NotEqual(first, rebuild);
-        Assert.Equal("libpjsua2maui@2.17.0.4", first.Value);
-        Assert.Equal("libpjsua2maui@2.17.0.4#review-1", rebuild.Value);
-        Assert.NotEqual("2.17.0.4", first.Package.Id);
+        Assert.Equal("libpjsua2maui@2.17.0.5", first.Value);
+        Assert.Equal("libpjsua2maui@2.17.0.5#review-1", rebuild.Value);
+        Assert.NotEqual("2.17.0.5", first.Package.Id);
     }
 
     [Fact]
     public void Manifest_PreservesVersionAndCopiesCollections()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(Package, version);
         var artifacts = new List<PackageArtifact>
         {
@@ -120,7 +120,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void Artifact_KeepsTfmAndRidSeparateAndAllowsUnknownPlatformShape()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var artifact = new PackageArtifact(
             Package,
             version,
@@ -143,7 +143,7 @@ public sealed class KnowledgeModelTests
     [InlineData("runtimes/win-x64/native/foo.dll")]
     public void Artifact_AcceptsCanonicalPackagePaths(string path)
     {
-        var artifact = new PackageArtifact(Package, PackageVersion.Parse("2.17.0.4"), path, ArtifactKind.Other);
+        var artifact = new PackageArtifact(Package, PackageVersion.Parse("2.17.0.5"), path, ArtifactKind.Other);
 
         Assert.Equal(path, artifact.RelativePath);
     }
@@ -160,13 +160,13 @@ public sealed class KnowledgeModelTests
     [InlineData(@"\\server\share\asset.dll")]
     public void Artifact_RejectsUnsafeOrNonCanonicalPaths(string path)
     {
-        Assert.Throws<ArgumentException>(() => new PackageArtifact(Package, PackageVersion.Parse("2.17.0.4"), path, ArtifactKind.Other));
+        Assert.Throws<ArgumentException>(() => new PackageArtifact(Package, PackageVersion.Parse("2.17.0.5"), path, ArtifactKind.Other));
     }
 
     [Fact]
     public void Artifact_RejectsMissingPathAndIndexedSetRejectsMissingManifest()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(Package, version);
         Assert.Throws<ArgumentNullException>(() => new PackageArtifact(Package, version, null!, ArtifactKind.Other));
         Assert.Throws<ArgumentException>(() => new PackageArtifact(Package, version, " ", ArtifactKind.Other));
@@ -178,7 +178,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void Documentation_AllowsRawMemberContentAndRequiresXmlArtifactFromSameVersion()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var xml = new PackageArtifact(Package, version, "lib/net10.0-android/libpjsua2maui.xml", ArtifactKind.XmlDocumentation, "net10.0-android");
         var documentation = new DocumentationRecord(Package, version, "M:Example.Call", "text <param name=\"value\">value</param>", xml, "net10.0-android");
 
@@ -189,7 +189,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void ProvenanceAndRelationship_CanRepresentAnUnresolvedPartialMapping()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(Package, version);
         var symbol = new SymbolIdentity("Example.Call", SymbolKind.Method);
         var provenance = new FactProvenance(identity, ProvenanceKind.PackageArtifact, "lib/net10.0-android/libpjsua2maui.dll", symbol, limitations: "Native mapping not established.");
@@ -203,7 +203,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void Models_RejectProvenanceFromAnotherPackageVersion()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var otherVersion = PackageVersion.Parse("2.17.0.10");
         var identity = new KnowledgeSetIdentity(Package, otherVersion);
 
@@ -214,7 +214,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void DocumentationAssociation_RejectsDifferentTfms()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var assembly = new PackageArtifact(Package, version, "lib/a.dll", ArtifactKind.ManagedAssembly, "net10.0-android");
         var xml = new PackageArtifact(Package, version, "lib/a.xml", ArtifactKind.XmlDocumentation, "net10.0-ios");
         var symbol = new SymbolRepresentation(Package, version, new SymbolIdentity("Example.Type", SymbolKind.Class), "net10.0-android", assembly);
@@ -241,7 +241,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void ModelConstructors_RejectMissingRequiredValuesAndInvalidOptionalText()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(Package, version);
         Assert.Throws<ArgumentNullException>(() => new KnowledgeSetIdentity(null!, version));
         Assert.Throws<ArgumentNullException>(() => new KnowledgeSetIdentity(Package, null!));
@@ -256,7 +256,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void CollectionModels_CopyInputsAndRejectInvalidManifestState()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(Package, version);
         var artifact = new PackageArtifact(Package, version, "lib/a.dll", ArtifactKind.ManagedAssembly);
         var indexed = new KnowledgeManifest(identity, artifacts: [artifact], status: KnowledgeManifestStatus.Indexed);
@@ -275,7 +275,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void ManifestAndExtractionModels_RejectMismatchedOrNullInputs()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var other = new PackageIdentity("other");
         var identity = new KnowledgeSetIdentity(Package, version);
         var foreignArtifact = new PackageArtifact(other, version, "lib/a.dll", ArtifactKind.ManagedAssembly);
@@ -300,7 +300,7 @@ public sealed class KnowledgeModelTests
         var options = new PackageAcquisitionOptions(Path.GetTempPath());
         Assert.Equal("https", options.PackageSource.Scheme);
         Assert.Equal("http", new PackageAcquisitionOptions(Path.GetTempPath(), new Uri("http://example.test/package")).PackageSource.Scheme);
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(Package, version);
         Assert.Throws<ArgumentNullException>(() => new PackageAcquisitionResult(null!, new KnowledgeManifest(identity), new PackageDocumentationValidation(version, new Dictionary<string, string>(), [], [])));
         Assert.Throws<ArgumentNullException>(() => new PackageAcquisitionResult("source.nupkg", null!, new PackageDocumentationValidation(version, new Dictionary<string, string>(), [], [])));
@@ -313,7 +313,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void KnowledgeModels_RejectNullRequiredDependencies()
     {
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var identity = new KnowledgeSetIdentity(Package, version);
         var artifact = new PackageArtifact(Package, version, "lib/a.dll", ArtifactKind.ManagedAssembly);
         var xml = new PackageArtifact(Package, version, "lib/a.xml", ArtifactKind.XmlDocumentation);
@@ -353,7 +353,7 @@ public sealed class KnowledgeModelTests
     [Fact]
     public void SymbolRepresentation_RejectsArtifactFromAnotherPackageVersion()
     {
-        var firstVersion = PackageVersion.Parse("2.17.0.4");
+        var firstVersion = PackageVersion.Parse("2.17.0.5");
         var secondVersion = PackageVersion.Parse("2.17.0.10");
         var artifact = new PackageArtifact(Package, firstVersion, "lib/a.dll", ArtifactKind.ManagedAssembly);
 

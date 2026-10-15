@@ -7,7 +7,7 @@ namespace libpjsua2maui.mcp.Knowledge;
 /// </summary>
 public sealed record PackageVersion : IComparable<PackageVersion>
 {
-    private static readonly PackageVersion MinimumSupported = new("2.17.0.4", skipMinimumValidation: true);
+    private static readonly PackageVersion MinimumSupported = new("2.17.0.5", skipMinimumValidation: true);
     private readonly IReadOnlyList<VersionIdentifier> _releaseIdentifiers = [];
     private readonly IReadOnlyList<int> _numericParts = [];
 

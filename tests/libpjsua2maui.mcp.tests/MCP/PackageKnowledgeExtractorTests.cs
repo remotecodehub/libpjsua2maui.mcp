@@ -78,7 +78,7 @@ public sealed class PackageKnowledgeExtractorTests
             """
             <doc><members>
               <member name="T:libpjsua2maui.mcp.Knowledge.PackageVersion"><summary>Version.</summary><remarks><see cref="T:System.Version"/> details.</remarks></member>
-              <member name="M:libpjsua2maui.mcp.Knowledge.PackageVersion.Parse(System.String)"><summary>Parse.</summary><param name="value">Input.</param><returns>A version.</returns><example>&lt;code&gt;2.17.0.4&lt;/code&gt;</example></member>
+              <member name="M:libpjsua2maui.mcp.Knowledge.PackageVersion.Parse(System.String)"><summary>Parse.</summary><param name="value">Input.</param><returns>A version.</returns><example>&lt;code&gt;2.17.0.5&lt;/code&gt;</example></member>
               <member name="M:missing.Member"><summary>Not associated.</summary></member>
             </members></doc>
             """);
@@ -103,7 +103,7 @@ public sealed class PackageKnowledgeExtractorTests
 
         Assert.All(result.Symbols, symbol => Assert.Equal("net10.0-android", symbol.TargetFramework));
         Assert.All(result.Documentation, item => Assert.Equal("net10.0-android", item.TargetFramework));
-        Assert.Equal("2.17.0.4", result.Acquisition.Manifest.PackageVersion.Value);
+        Assert.Equal("2.17.0.5", result.Acquisition.Manifest.PackageVersion.Value);
         Assert.All(result.Documentation, item => Assert.Equal("lib/net10.0-android/libpjsua2maui.xml", item.SourceArtifact.RelativePath));
     }
 
@@ -114,7 +114,7 @@ public sealed class PackageKnowledgeExtractorTests
 
         var exception = await Assert.ThrowsAsync<InvalidDataException>(() => new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken));
 
-        Assert.Contains("libpjsua2maui 2.17.0.4", exception.Message);
+        Assert.Contains("libpjsua2maui 2.17.0.5", exception.Message);
         Assert.Contains("net10.0-android", exception.Message);
     }
 
@@ -174,8 +174,31 @@ public sealed class PackageKnowledgeExtractorTests
         Assert.Equal(KnowledgeConfidence.Strong, evidence.Confidence);
     }
 
+    [Fact]
+    public async Task ExtractAsync_InspectsPublishedManagedAndNativeSources()
+    {
+        using var package = CreatePackage(
+            "net10.0-windows10.0.19041",
+            typeof(PackageVersion).Assembly.Location,
+            "<doc><members /></doc>",
+            sourceEntries:
+            [
+                ("src/Platforms/Windows/pjsua2maui/pjsua2/Account.cs", "// Version 4.5.1\npublic class Account { HandleRef p; bool swigCMemOwn; void Dispose() { pjsua2PINVOKE.delete_Account(p); } }"),
+                ("src/Platforms/Windows/cpp/pjsua2_wrap.cpp", "#include <pjsua2/endpoint.hpp>\nvoid CSharp_libpjsua2fmaui_Account_delete_Account() {}"),
+                ("src/Platforms/Windows/cpp/pjsua2_wrap.hpp", "#include <pjsua2/types.hpp>")
+            ]);
 
-    private static TestPackage CreatePackage(string tfm, string? assemblyPath, string xml, string? assemblyContent = null, string? nativePath = null)
+        var result = await new PackageKnowledgeExtractor().ExtractAsync(package.Acquisition, TestContext.Current.CancellationToken);
+
+        Assert.Contains(result.Acquisition.Manifest.Artifacts, item => item.Kind == ArtifactKind.ManagedSource);
+        Assert.Contains(result.Acquisition.Manifest.Artifacts, item => item.Kind == ArtifactKind.NativeSource);
+        Assert.Contains(result.Acquisition.Manifest.Artifacts, item => item.Kind == ArtifactKind.NativeHeader);
+        Assert.Contains(result.Relationships, item => item.RelationshipType == "native-to-pjproject-text");
+        Assert.Contains(result.LifecycleFacts, item => item.Kind == LifecycleFactKind.Disposal);
+    }
+
+
+    private static TestPackage CreatePackage(string tfm, string? assemblyPath, string xml, string? assemblyContent = null, string? nativePath = null, params (string Path, string Content)[] sourceEntries)
     {
         var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"libpjsua2maui-extractor-{Guid.NewGuid():N}.nupkg");
         using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -187,10 +210,15 @@ public sealed class PackageKnowledgeExtractorTests
             {
                 AddEntry(archive, nativePath, []);
             }
+
+            foreach (var source in sourceEntries)
+            {
+                AddEntry(archive, source.Path, Encoding.UTF8.GetBytes(source.Content));
+            }
         }
 
         var packageIdentity = new PackageIdentity("libpjsua2maui");
-        var version = PackageVersion.Parse("2.17.0.4");
+        var version = PackageVersion.Parse("2.17.0.5");
         var assembly = new PackageArtifact(packageIdentity, version, $"lib/{tfm}/libpjsua2maui.dll", ArtifactKind.ManagedAssembly, tfm);
         var documentation = new PackageArtifact(packageIdentity, version, $"lib/{tfm}/libpjsua2maui.xml", ArtifactKind.XmlDocumentation, tfm);
         var artifacts = new List<PackageArtifact> { assembly, documentation };
@@ -198,6 +226,18 @@ public sealed class PackageKnowledgeExtractorTests
         {
             var runtimeIdentifier = nativePath.Split('/')[1];
             artifacts.Add(new PackageArtifact(packageIdentity, version, nativePath, ArtifactKind.NativeLibrary, runtimeIdentifier: runtimeIdentifier));
+        }
+
+        foreach (var source in sourceEntries)
+        {
+            var kind = Path.GetExtension(source.Path).ToLowerInvariant() switch
+            {
+                ".cs" => ArtifactKind.ManagedSource,
+                ".cpp" => ArtifactKind.NativeSource,
+                ".h" or ".hpp" => ArtifactKind.NativeHeader,
+                _ => ArtifactKind.Other
+            };
+            artifacts.Add(new PackageArtifact(packageIdentity, version, source.Path, kind, tfm));
         }
         var manifest = new KnowledgeManifest(new KnowledgeSetIdentity(packageIdentity, version), artifacts: artifacts, status: KnowledgeManifestStatus.Validated);
         var validation = new PackageDocumentationValidation(version, new Dictionary<string, string> { [tfm] = documentation.RelativePath }, [tfm], []);
