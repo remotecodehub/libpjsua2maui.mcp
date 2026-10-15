@@ -11,8 +11,10 @@ public sealed class SourceInspection
     private static readonly Regex PInvokeDeclarationPattern = new("DllImport\\(\\s*\\\"(?<library>[^\\\"]+)\\\"\\s*,\\s*EntryPoint\\s*=\\s*\\\"(?<entry>[^\\\"]+)\\\"\\s*\\)[\\s\\S]{0,500}?(?:extern\\s+)?(?<method>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(", RegexOptions.Compiled);
     private static readonly Regex CppDefinitionPattern = new("CSharp_libpjsua2fmaui_(?<symbol>[A-Za-z_][A-Za-z0-9_]*?)(?<suffix>_{0,3})\\s*\\((?<parameters>[^)]*)\\)\\s*\\{", RegexOptions.Compiled);
     private static readonly Regex IncludePattern = new("^\\s*#include\\s*[<\\\"](?<include>[^>\\\"]+)[>\\\"]", RegexOptions.Multiline | RegexOptions.Compiled);
-    private static readonly Regex PjCallPattern = new("(?:\\)->|\\.)(?<method>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(", RegexOptions.Compiled);
-    private static readonly Regex PjTypePattern = new("\\bpj::(?<type>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    private static readonly Regex PjInstanceCallPattern = new(@"\(?\s*(?<variable>[A-Za-z_][A-Za-z0-9_]*)\s*\)?->(?<method>[A-Za-z_][A-Za-z0-9_]*)\s*\(", RegexOptions.Compiled);
+    private static readonly Regex PjQualifiedCallPattern = new(@"pj::(?<type>[A-Za-z_][A-Za-z0-9_]*)::(?<method>[A-Za-z_][A-Za-z0-9_]*)\s*\(", RegexOptions.Compiled);
+    private static readonly Regex PjVariablePattern = new(@"\bpj::(?<type>[A-Za-z_][A-Za-z0-9_]*)\s*(?:\*|&)\s*(?<variable>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
+    private static readonly Regex AnyNativeVariablePattern = new(@"\b(?:pj|std)::[^;\r\n]*[&*]\s*(?<variable>arg[0-9]+)\b", RegexOptions.Compiled);
 
     /// <summary>Returns facts supported by one published source artifact.</summary>
     public SourceInspectionResult Inspect(PackageAcquisitionResult acquisition, PackageArtifact artifact, string content)
@@ -25,11 +27,19 @@ public sealed class SourceInspection
         var relationships = new List<KnowledgeRelationship>();
         var lifecycle = new List<LifecycleFact>();
         var symbols = new List<string>();
+        var coverage = new SourceInspectionCoverage();
+        var diagnostics = new List<SourceInspectionDiagnostic>();
 
         if (artifact.Kind == ArtifactKind.ManagedSource)
         {
             var swigVersion = SwigVersionPattern.Match(content).Groups["version"].Value;
-            foreach (Match match in CSharpTypePattern.Matches(content))
+            var typeMatches = CSharpTypePattern.Matches(content).ToArray();
+            coverage = coverage with
+            {
+                ManagedTypesDiscovered = typeMatches.Length,
+                ManagedMembersDiscovered = CountManagedMembers(content)
+            };
+            foreach (Match match in typeMatches)
             {
                 var managedName = match.Groups["name"].Value;
                 symbols.Add(managedName);
@@ -64,20 +74,36 @@ public sealed class SourceInspection
             }
         }
 
-        return new SourceInspectionResult(artifact, symbols.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), relationships, lifecycle, provenance);
+        return new SourceInspectionResult(artifact, symbols.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), relationships, lifecycle, provenance, coverage, diagnostics);
     }
 
     /// <summary>Correlates direct managed calls, P/Invoke declarations, wrapper bodies and pjproject sources.</summary>
     public IReadOnlyList<KnowledgeRelationship> InspectRepositoryMappings(PackageAcquisitionResult acquisition, IReadOnlyDictionary<string, string> packageSources, SourceRepositoryDescriptor repository)
+        => InspectRepositoryMappingsDetailed(acquisition, packageSources, repository).Relationships;
+
+    /// <summary>Correlates repository sources and returns relationships, coverage denominators and parser diagnostics.</summary>
+    public RepositoryMappingInspectionResult InspectRepositoryMappingsDetailed(PackageAcquisitionResult acquisition, IReadOnlyDictionary<string, string> packageSources, SourceRepositoryDescriptor repository)
     {
         ArgumentNullException.ThrowIfNull(acquisition);
         ArgumentNullException.ThrowIfNull(packageSources);
         ArgumentNullException.ThrowIfNull(repository);
 
         var results = new List<KnowledgeRelationship>();
+        var diagnostics = new List<SourceInspectionDiagnostic>();
         var managedSources = packageSources.Where(item => item.Key.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) && item.Key.Contains("/pjsua2/", StringComparison.OrdinalIgnoreCase)).OrderBy(item => item.Key, StringComparer.Ordinal);
         var pinvoke = packageSources.Where(item => item.Key.EndsWith("pjsua2PINVOKE.cs", StringComparison.OrdinalIgnoreCase)).SelectMany(item => ParsePInvokes(item.Key, item.Value)).GroupBy(item => item.Method, StringComparer.Ordinal).ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
         var wrappers = packageSources.Where(item => item.Key.EndsWith("pjsua2_wrap.cpp", StringComparison.OrdinalIgnoreCase)).SelectMany(item => ParseCppDefinitions(item.Key, item.Value)).ToDictionary(item => item.EntryPoint, StringComparer.Ordinal);
+        var coverage = new SourceInspectionCoverage
+        {
+            ManagedTypesDiscovered = managedSources.Sum(item => CSharpTypePattern.Matches(item.Value).Count),
+            ManagedMembersDiscovered = managedSources.Sum(item => CountManagedMembers(item.Value)),
+            SwigCallsDiscovered = managedSources.Sum(item => PInvokeCallPattern.Matches(item.Value).Count),
+            PInvokeDeclarationsDiscovered = pinvoke.Count,
+            PInvokeDeclarationsResolvedToWrapper = pinvoke.Values.Count(item => wrappers.ContainsKey(item.EntryPoint)),
+            WrapperDefinitionsDiscovered = wrappers.Count
+        };
+        var membersWithCalls = new HashSet<string>(StringComparer.Ordinal);
+        var resolvedSwigCalls = 0;
 
         foreach (var managed in managedSources)
         {
@@ -86,6 +112,7 @@ public sealed class SourceInspection
             {
                 var method = FindManagedMember(managed.Value, call.Index, typeName);
                 var callName = call.Groups["call"].Value;
+                membersWithCalls.Add($"{managed.Key}::{method}");
                 var managedNode = Node(KnowledgeNodeKind.ManagedSymbol, $"managed:{managed.Key}::{method}");
                 var swigNode = Node(KnowledgeNodeKind.SwigSymbol, $"swig:{managed.Key}::{callName}");
                 results.Add(Relationship(acquisition, "managed-member-to-swig-call", managedNode, swigNode, KnowledgeFactStatus.Established, PackageSourceProvenance(acquisition, managed.Key, $"Direct generated C# call pjsua2PINVOKE.{callName}."), KnowledgeConfidence.Confirmed));
@@ -95,6 +122,8 @@ public sealed class SourceInspection
                     results.Add(Relationship(acquisition, "swig-call-to-pinvoke", swigNode, Unknown(KnowledgeNodeKind.WrapperSymbol), KnowledgeFactStatus.Unknown, PackageSourceProvenance(acquisition, managed.Key, "No matching P/Invoke declaration was found."), KnowledgeConfidence.Strong));
                     continue;
                 }
+
+                resolvedSwigCalls++;
 
                 var pinvokeNode = Node(KnowledgeNodeKind.SwigSymbol, $"pinvoke:{declaration.Method}");
                 results.Add(Relationship(acquisition, "swig-call-to-pinvoke", swigNode, pinvokeNode, KnowledgeFactStatus.Established, PackageSourceProvenance(acquisition, declaration.Path, $"DllImport EntryPoint {declaration.EntryPoint} declares pjsua2PINVOKE.{declaration.Method}."), KnowledgeConfidence.Confirmed));
@@ -107,26 +136,35 @@ public sealed class SourceInspection
 
                 var wrapperNode = Node(KnowledgeNodeKind.WrapperSymbol, $"wrapper:{wrapper.Path}::{wrapper.EntryPoint}");
                 results.Add(Relationship(acquisition, "pinvoke-to-native-wrapper", pinvokeNode, wrapperNode, KnowledgeFactStatus.Established, RepositoryProvenance(acquisition, repository, wrapper.Path, managed.Key, "The exact P/Invoke entry point has a matching generated C++ definition."), KnowledgeConfidence.Confirmed));
-                AddPjprojectMappings(acquisition, repository, wrapper, wrapperNode, results);
+                AddPjprojectMappings(acquisition, repository, wrapper, wrapperNode, results, diagnostics, ref coverage);
             }
         }
 
-        return results;
+        return new RepositoryMappingInspectionResult(results, coverage with
+        {
+            ManagedMembersWithSwigCalls = membersWithCalls.Count,
+            SwigCallsResolvedToPInvoke = resolvedSwigCalls
+        }, diagnostics);
     }
 
-    private static void AddPjprojectMappings(PackageAcquisitionResult acquisition, SourceRepositoryDescriptor repository, CppDefinition wrapper, KnowledgeNodeReference wrapperNode, ICollection<KnowledgeRelationship> relationships)
+    private static void AddPjprojectMappings(PackageAcquisitionResult acquisition, SourceRepositoryDescriptor repository, CppDefinition wrapper, KnowledgeNodeReference wrapperNode, ICollection<KnowledgeRelationship> relationships, ICollection<SourceInspectionDiagnostic> diagnostics, ref SourceInspectionCoverage coverage)
     {
-        var typeMatches = PjTypePattern.Matches(wrapper.Body).ToArray();
-        var callMatches = PjCallPattern.Matches(wrapper.Body).ToArray();
-        var pairs = callMatches
-            .Select(call =>
-            {
-                var type = typeMatches.LastOrDefault(candidate => candidate.Index <= call.Index)?.Groups["type"].Value;
-                return (Type: type, Method: call.Groups["method"].Value);
-            })
-            .Where(pair => pair.Type is not null)
-            .Distinct()
-            .ToArray();
+        var variables = PjVariablePattern.Matches(wrapper.Body)
+            .ToDictionary(match => match.Groups["variable"].Value, match => match.Groups["type"].Value, StringComparer.Ordinal);
+        var qualifiedPairs = PjQualifiedCallPattern.Matches(wrapper.Body)
+            .Select(match => (Type: match.Groups["type"].Value, Method: match.Groups["method"].Value));
+        var instancePairs = PjInstanceCallPattern.Matches(wrapper.Body)
+            .Where(match => variables.ContainsKey(match.Groups["variable"].Value))
+            .Select(match => (Type: variables[match.Groups["variable"].Value], Method: match.Groups["method"].Value));
+        var lifecyclePairs = ConstructorOrDestructorPair(wrapper, variables);
+        var pairs = qualifiedPairs.Concat(instancePairs).Concat(lifecyclePairs).Distinct().ToArray();
+        coverage = coverage with { WrapperInvocationsDiscovered = coverage.WrapperInvocationsDiscovered + PjQualifiedCallPattern.Matches(wrapper.Body).Count + PjInstanceCallPattern.Matches(wrapper.Body).Count + lifecyclePairs.Length };
+        var unsupportedReceiver = PjInstanceCallPattern.Matches(wrapper.Body)
+            .FirstOrDefault(match => match.Groups["variable"].Value.StartsWith("arg", StringComparison.Ordinal) && !AnyNativeVariablePattern.Matches(wrapper.Body).Cast<Match>().Any(declaration => declaration.Groups["variable"].Value.Equals(match.Groups["variable"].Value, StringComparison.Ordinal)));
+        if (unsupportedReceiver is not null && wrapper.Body.Contains("pj::", StringComparison.Ordinal))
+        {
+            diagnostics.Add(new SourceInspectionDiagnostic(wrapper.Path, "pjproject instance invocation", "The wrapper contains an instance call, but no pj:: pointer/reference declaration matched its receiver.", SourceInspectionDiagnosticKind.Unparsed));
+        }
         if (pairs.Length == 0)
         {
             relationships.Add(Relationship(acquisition, "native-wrapper-to-pjproject", wrapperNode, Unknown(KnowledgeNodeKind.NativeSymbol), KnowledgeFactStatus.Unknown, RepositoryProvenance(acquisition, repository, wrapper.Path, null, "The wrapper definition contains no resolvable pj:: type/member invocation."), KnowledgeConfidence.Strong));
@@ -142,6 +180,12 @@ public sealed class SourceInspection
                 var declaration = header is not null && ContainsDeclaration(header.Value.Content, type, method);
                 var implementation = FindPjImplementation(repository.PjprojectRootPath, type, method);
                 if (!declaration && implementation is null) continue;
+
+                coverage = coverage with
+                {
+                    WrapperInvocationsResolvedToPjprojectDeclaration = coverage.WrapperInvocationsResolvedToPjprojectDeclaration + (declaration ? 1 : 0),
+                    PjprojectDeclarationsResolvedToImplementation = coverage.PjprojectDeclarationsResolvedToImplementation + (implementation is not null ? 1 : 0)
+                };
 
                 resolved = true;
                 var declarationPath = header?.RelativePath ?? implementation!.Value.RelativePath;
@@ -160,14 +204,33 @@ public sealed class SourceInspection
 
     private static void AddLifecycleFacts(PackageAcquisitionResult acquisition, PackageArtifact artifact, string content, FactProvenance provenance, ICollection<LifecycleFact> lifecycle)
     {
-        if (content.Contains("HandleRef", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, artifact, LifecycleFactKind.Handle, "HandleRef is used by the generated managed wrapper.", provenance));
-        if (content.Contains("swigCMemOwn", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, artifact, LifecycleFactKind.Ownership, "swigCMemOwn controls native destruction ownership.", provenance));
-        if (content.Contains("Dispose", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, artifact, LifecycleFactKind.Disposal, "The generated wrapper exposes Dispose and/or a disposal path.", provenance));
-        if (content.Contains("delete_", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, artifact, LifecycleFactKind.NativeDestruction, "The generated wrapper invokes a delete_* P/Invoke entry point.", provenance));
-        if (content.Contains("director", StringComparison.OrdinalIgnoreCase) || content.Contains("SwigDelegate", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, artifact, LifecycleFactKind.CallbackRegistration, "SWIG director/delegate callback infrastructure is present.", provenance));
+        foreach (var type in FindManagedTypes(content))
+        {
+            var subject = Node(KnowledgeNodeKind.ManagedSymbol, $"managed:{artifact.RelativePath}::{type.Name}");
+            var body = type.Body;
+            if (body.Contains("HandleRef", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, subject, LifecycleFactKind.Handle, "HandleRef field/use belongs to this generated type.", provenance));
+            if (body.Contains("swigCMemOwn", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, subject, LifecycleFactKind.Ownership, "swigCMemOwn field controls native destruction ownership for this generated type.", provenance));
+            if (Regex.IsMatch(body, @"\bDispose\s*\(", RegexOptions.CultureInvariant)) lifecycle.Add(CreateLifecycle(acquisition, subject, LifecycleFactKind.Disposal, "Dispose() belongs to this generated type.", provenance));
+            if (body.Contains($"~{type.Name}(", StringComparison.Ordinal) || body.Contains("delete_", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, subject, LifecycleFactKind.NativeDestruction, "A finalizer or delete_* path is present in this generated type.", provenance));
+            if (body.Contains("director", StringComparison.OrdinalIgnoreCase) || body.Contains("SwigDelegate", StringComparison.Ordinal)) lifecycle.Add(CreateLifecycle(acquisition, subject, LifecycleFactKind.CallbackRegistration, "Director/delegate callback infrastructure belongs to this generated type.", provenance));
+        }
     }
 
-    private static LifecycleFact CreateLifecycle(PackageAcquisitionResult acquisition, PackageArtifact artifact, LifecycleFactKind kind, string value, FactProvenance provenance) => new(acquisition.Manifest.Identity, Node(KnowledgeNodeKind.ManagedSymbol, $"source:{artifact.RelativePath}"), kind, KnowledgeFactStatus.Established, value, provenance, KnowledgeConfidence.Confirmed);
+    private static (string Type, string Method)[] ConstructorOrDestructorPair(CppDefinition wrapper, IReadOnlyDictionary<string, string> variables)
+    {
+        var constructor = Regex.Match(wrapper.EntryPoint, @"new_(?<type>[A-Za-z_][A-Za-z0-9_]*?)(?:_{1,3})?$", RegexOptions.CultureInvariant);
+        if (constructor.Success && variables.Values.Contains(constructor.Groups["type"].Value, StringComparer.Ordinal))
+        {
+            return [(constructor.Groups["type"].Value, "#ctor")];
+        }
+
+        var destructor = Regex.Match(wrapper.EntryPoint, @"delete_(?<type>[A-Za-z_][A-Za-z0-9_]*?)(?:_{1,3})?$", RegexOptions.CultureInvariant);
+        return destructor.Success && variables.Values.Contains(destructor.Groups["type"].Value, StringComparer.Ordinal)
+            ? [(destructor.Groups["type"].Value, "#dtor")]
+            : [];
+    }
+
+    private static LifecycleFact CreateLifecycle(PackageAcquisitionResult acquisition, KnowledgeNodeReference subject, LifecycleFactKind kind, string value, FactProvenance provenance) => new(acquisition.Manifest.Identity, subject, kind, KnowledgeFactStatus.Established, value, provenance, KnowledgeConfidence.Confirmed);
     private static FactProvenance PackageProvenance(PackageAcquisitionResult acquisition, PackageArtifact artifact, string evidence) => new(acquisition.Manifest.Identity, ProvenanceKind.PackageArtifact, artifact.RelativePath, sourceReference: artifact.RelativePath, targetFramework: artifact.TargetFramework, runtimeIdentifier: artifact.RuntimeIdentifier, evidence: evidence);
     private static FactProvenance PackageSourceProvenance(PackageAcquisitionResult acquisition, string path, string evidence)
     {
@@ -189,6 +252,31 @@ public sealed class SourceInspection
         var prefix = content[..position];
         var matches = Regex.Matches(prefix, "(?:public|protected|private|internal|static|virtual|override|sealed|async|\\s)+[A-Za-z_][A-Za-z0-9_<>,.?\\[\\]]*\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\\s*\\(");
         return matches.Count == 0 ? typeName : matches[^1].Groups["name"].Value;
+    }
+
+    private static int CountManagedMembers(string content)
+    {
+        return Regex.Matches(content, @"\b(?:public|protected|private|internal)\s+(?:static\s+|virtual\s+|override\s+|sealed\s+|async\s+)*[A-Za-z_][A-Za-z0-9_<>,.?\[\]]*\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\(|\{)", RegexOptions.CultureInvariant).Count;
+    }
+
+    private static IReadOnlyList<ManagedTypeRegion> FindManagedTypes(string content)
+    {
+        var regions = new List<ManagedTypeRegion>();
+        foreach (Match match in CSharpTypePattern.Matches(content))
+        {
+            var open = content.IndexOf('{', match.Index + match.Length);
+            if (open < 0)
+            {
+                regions.Add(new ManagedTypeRegion(match.Groups["name"].Value, string.Empty));
+                continue;
+            }
+
+            var close = FindMatchingBrace(content, open);
+            var body = close < 0 ? content[(open + 1)..] : content.Substring(open + 1, close - open - 1);
+            regions.Add(new ManagedTypeRegion(match.Groups["name"].Value, body));
+        }
+
+        return regions;
     }
 
     private static IReadOnlyList<PInvokeDeclaration> ParsePInvokes(string path, string content) => PInvokeDeclarationPattern.Matches(content).Select(match => new PInvokeDeclaration(path, match.Groups["method"].Value, match.Groups["entry"].Value)).ToArray();
@@ -236,15 +324,31 @@ public sealed class SourceInspection
         foreach (var path in candidates)
         {
             var content = File.ReadAllText(path);
-            if (Regex.IsMatch(content, $"\\b{Regex.Escape(type)}::{Regex.Escape(method)}\\s*\\(", RegexOptions.CultureInvariant)) return (Relative(root, path), content);
+            var memberPattern = method switch
+            {
+                "#ctor" => $"\\b{Regex.Escape(type)}::{Regex.Escape(type)}\\s*\\(",
+                "#dtor" => $"~{Regex.Escape(type)}\\s*\\(",
+                _ => $"\\b{Regex.Escape(type)}::{Regex.Escape(method)}\\s*\\("
+            };
+            if (Regex.IsMatch(content, memberPattern, RegexOptions.CultureInvariant)) return (Relative(root, path), content);
         }
 
         return null;
     }
 
-    private static bool ContainsDeclaration(string content, string type, string method) => Regex.IsMatch(content, $"\\b(?:class|struct)\\s+{Regex.Escape(type)}\\b", RegexOptions.CultureInvariant) && Regex.IsMatch(content, $"\\b{Regex.Escape(method)}\\s*\\(", RegexOptions.CultureInvariant);
+    private static bool ContainsDeclaration(string content, string type, string method)
+    {
+        if (!Regex.IsMatch(content, $"\\b(?:class|struct)\\s+{Regex.Escape(type)}\\b", RegexOptions.CultureInvariant)) return false;
+        return method switch
+        {
+            "#ctor" => true,
+            "#dtor" => Regex.IsMatch(content, $"~{Regex.Escape(type)}\\s*\\(", RegexOptions.CultureInvariant),
+            _ => Regex.IsMatch(content, $"\\b{Regex.Escape(method)}\\s*\\(", RegexOptions.CultureInvariant)
+        };
+    }
     private static string Relative(string root, string path) => Path.GetRelativePath(root, path).Replace('\\', '/');
 
     private sealed record PInvokeDeclaration(string Path, string Method, string EntryPoint);
     private sealed record CppDefinition(string Path, string EntryPoint, string Body);
+    private sealed record ManagedTypeRegion(string Name, string Body);
 }

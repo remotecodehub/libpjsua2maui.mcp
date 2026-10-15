@@ -26,6 +26,8 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         var relationships = new List<KnowledgeRelationship>();
         var lifecycleFacts = new List<LifecycleFact>();
         var sourceInspections = new List<SourceInspectionResult>();
+        var sourceCoverage = new SourceInspectionCoverage();
+        var sourceDiagnostics = new List<SourceInspectionDiagnostic>();
         var sourceContents = new Dictionary<string, string>(StringComparer.Ordinal);
 
         await using var packageStream = new FileStream(acquisition.ArtifactPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
@@ -50,6 +52,8 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
                 sourceContents[sourceArtifact.RelativePath] = content;
                 var inspection = sourceInspector.Inspect(acquisition, sourceArtifact, content);
                 sourceInspections.Add(inspection);
+                sourceCoverage = sourceCoverage.Add(inspection.Coverage ?? new SourceInspectionCoverage());
+                sourceDiagnostics.AddRange(inspection.Diagnostics ?? []);
                 relationships.AddRange(inspection.Relationships);
                 lifecycleFacts.AddRange(inspection.LifecycleFacts);
             }
@@ -126,10 +130,13 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
 
         if (_sourceRepository is not null && sourceContents.Count > 0)
         {
-            relationships.AddRange(new SourceInspection().InspectRepositoryMappings(acquisition, sourceContents, _sourceRepository));
+            var repositoryInspection = new SourceInspection().InspectRepositoryMappingsDetailed(acquisition, sourceContents, _sourceRepository);
+            relationships.AddRange(repositoryInspection.Relationships);
+            sourceCoverage = sourceCoverage.Add(repositoryInspection.Coverage);
+            sourceDiagnostics.AddRange(repositoryInspection.Diagnostics);
         }
 
-        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence);
+        return new PackageExtractionResult(acquisition, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence, sourceCoverage, sourceDiagnostics);
     }
 
     private static void AddPlatformEvidence(ICollection<PlatformEvidence> evidence, PackageAcquisitionResult acquisition, PackageArtifact assembly, KnowledgePlatform platform, IReadOnlyList<PackageArtifact> nativeArtifacts, IReadOnlyList<PackageArtifact> sourceArtifacts)
@@ -157,12 +164,31 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         var managedSources = sourceArtifacts.Where(a => a.Kind == ArtifactKind.ManagedSource).ToArray();
         var nativeSources = sourceArtifacts.Where(a => a.Kind == ArtifactKind.NativeSource).ToArray();
         var nativeHeaders = sourceArtifacts.Where(a => a.Kind == ArtifactKind.NativeHeader).ToArray();
-        var artifacts = sourceArtifacts.Select(a => a.RelativePath).Concat(nativeArtifacts.Select(a => a.RelativePath)).Order(StringComparer.Ordinal).ToArray();
         foreach (var symbol in symbols.Where(symbol => symbol.Identity.Kind != SymbolKind.Namespace))
         {
-            var provenance = new FactProvenance(acquisition.Manifest.Identity, ProvenanceKind.PackageArtifact, symbol.SourceArtifact?.RelativePath, symbol.Identity, sourceReference: artifacts.Length == 0 ? assembly.RelativePath : string.Join(", ", artifacts), limitations: "This is distribution/source evidence only; runtime execution was not validated.", targetFramework: symbol.TargetFramework, evidence: "Public managed symbol correlated with the platform assembly and generated source inventory.");
-            evidence.Add(new PlatformEvidence(acquisition.Manifest.Identity, new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, symbol.Identity.QualifiedName), platform, assembly.TargetFramework, null, PlatformArtifactStatus.Present, nativeArtifacts.Count == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, nativeArtifacts.Count > 0 && managedSources.Length > 0 && nativeSources.Length > 0 && nativeHeaders.Length > 0 ? KnowledgeConfidence.Confirmed : KnowledgeConfidence.Strong, provenance, nativeArtifacts.Count == 0 ? "Native distribution artifact was not identified for this platform." : null, managedSources.Length == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, nativeSources.Length == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, nativeHeaders.Length == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, PlatformRuntimeStatus.NotValidated, artifacts));
+            var matchingManagedSources = managedSources.Where(source => SymbolBelongsToSource(symbol.Identity.QualifiedName, source.RelativePath)).ToArray();
+            var artifacts = matchingManagedSources.Select(a => a.RelativePath)
+                .Concat(nativeSources.Select(a => a.RelativePath))
+                .Concat(nativeHeaders.Select(a => a.RelativePath))
+                .Concat(nativeArtifacts.Select(a => a.RelativePath))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            var limitations = new List<string>();
+            if (matchingManagedSources.Length == 0) limitations.Add("No generated source file could be associated with this managed symbol.");
+            if (nativeArtifacts.Count == 0) limitations.Add("Native distribution artifact was not identified for this platform.");
+            limitations.Add("Static source inspection does not validate native runtime loading or execution.");
+            var provenance = new FactProvenance(acquisition.Manifest.Identity, ProvenanceKind.PackageArtifact, symbol.SourceArtifact?.RelativePath, symbol.Identity, sourceReference: artifacts.Length == 0 ? assembly.RelativePath : string.Join(", ", artifacts), limitations: string.Join(" ", limitations), targetFramework: symbol.TargetFramework, evidence: matchingManagedSources.Length == 0 ? "Public managed symbol was found in the platform assembly; no type-specific generated source path matched it." : "Managed symbol name was matched to its generated source file path; wrapper and native assets remain separately evidenced.");
+            var confidence = matchingManagedSources.Length > 0 && nativeArtifacts.Count > 0 && nativeSources.Length > 0 && nativeHeaders.Length > 0 ? KnowledgeConfidence.Confirmed : KnowledgeConfidence.Strong;
+            evidence.Add(new PlatformEvidence(acquisition.Manifest.Identity, new KnowledgeNodeReference(KnowledgeNodeKind.ManagedSymbol, symbol.Identity.QualifiedName), platform, assembly.TargetFramework, null, PlatformArtifactStatus.Present, nativeArtifacts.Count == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, confidence, provenance, string.Join(" ", limitations), matchingManagedSources.Length == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, nativeSources.Length == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, nativeHeaders.Length == 0 ? PlatformArtifactStatus.Unknown : PlatformArtifactStatus.Present, PlatformRuntimeStatus.NotValidated, artifacts));
         }
+    }
+
+    private static bool SymbolBelongsToSource(string qualifiedName, string sourcePath)
+    {
+        var typeName = Path.GetFileNameWithoutExtension(sourcePath);
+        return qualifiedName.Equals(typeName, StringComparison.Ordinal) ||
+            qualifiedName.Contains($".{typeName}.", StringComparison.Ordinal) ||
+            qualifiedName.EndsWith($".{typeName}", StringComparison.Ordinal);
     }
 
     private static bool IsPrimaryLibAssembly(PackageArtifact artifact)

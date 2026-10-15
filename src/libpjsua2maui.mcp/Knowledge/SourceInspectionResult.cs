@@ -6,4 +6,6 @@ public sealed record SourceInspectionResult(
     IReadOnlyList<string> Symbols,
     IReadOnlyList<KnowledgeRelationship> Relationships,
     IReadOnlyList<LifecycleFact> LifecycleFacts,
-    FactProvenance Provenance);
+    FactProvenance Provenance,
+    SourceInspectionCoverage? Coverage = null,
+    IReadOnlyList<SourceInspectionDiagnostic>? Diagnostics = null);

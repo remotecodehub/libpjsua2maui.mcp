@@ -31,3 +31,26 @@ The source tree contains 315 generated C# files per platform directory for Andro
 ## Platform evidence
 
 The extractor emits assembly-level and managed-symbol-level `PlatformEvidence` observations for the four published TFMs: `net10.0-android36.0`, `net10.0-ios26.0`, `net10.0-maccatalyst26.0` and `net10.0-windows10.0.19041`. Each record includes generated C# source, wrapper C++, header and native asset statuses, concrete package paths, confidence, provenance and `NotValidated` runtime status. Package asset presence is distribution evidence; runtime execution remains outside this phase.
+
+## Deterministic mapping coverage
+
+The extractor exposes `PackageExtractionResult.SourceCoverage`; its denominators are calculated from the exact source dictionary inspected, not from examples or estimates:
+
+| Counter | Denominator/meaning |
+| --- | --- |
+| `ManagedTypesDiscovered` | generated C# type declarations matched |
+| `ManagedMembersDiscovered` | generated C# members matched by the source inspector |
+| `ManagedMembersWithSwigCalls` | distinct managed source members containing a `pjsua2PINVOKE` call |
+| `SwigCallsDiscovered` / `SwigCallsResolvedToPInvoke` | direct generated calls and exact declaration resolutions |
+| `PInvokeDeclarationsDiscovered` / `PInvokeDeclarationsResolvedToWrapper` | exact `DllImport` declarations and matching C++ entry points |
+| `WrapperDefinitionsDiscovered` | generated C++ wrapper definitions |
+| `WrapperInvocationsDiscovered` / `WrapperInvocationsResolvedToPjprojectDeclaration` | supported instance/qualified pjproject calls and declaration resolutions |
+| `PjprojectDeclarationsResolvedToImplementation` | declaration calls with a matching pjproject implementation |
+
+The repository inspector supports both generated instance calls such as `(arg1)->create()` and qualified calls such as `pj::Account::notify()`. It binds instance calls through the declared `pj::Type*`/`pj::Type&` receiver rather than using the last type token in the function body. `SourceInspectionDiagnostic` records constructions that are present but unparsed; these are implementation limitations and are not represented as ordinary evidence `Unknown` relationships.
+
+Lifecycle facts are emitted with a managed type node (`managed:<source-path>::<type>`), not merely a source-file node. The facts remain static observations: runtime callback retention, thread affinity, late callbacks and use-after-disposal behavior are not asserted without source evidence.
+
+For the final hardening validation, the direct executable run produced 172 passing tests and the following ReportGenerator summary: 97.4% lines, 90.2% branches (`921/1020`) and 98.1% methods (`158/161`). The HTML report is under `tests/libpjsua2maui.mcp.tests/TestResults/HardeningFinal10/Report/`. These are test-code coverage metrics, while the mapping counters above are source-inspection denominators and must not be conflated.
+
+Relationship status remains evidence-based: `Established` is used for exact resolved links, `Partial` for a demonstrated prefix with a missing native link, `Unknown` for a missing endpoint without sufficient evidence, and `Unparsed` diagnostics for constructs the inspector cannot interpret. No unsupported parser construct is promoted to `Established`.

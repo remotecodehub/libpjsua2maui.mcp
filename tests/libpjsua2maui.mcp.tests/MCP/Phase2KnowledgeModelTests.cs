@@ -134,6 +134,13 @@ public sealed class Phase2KnowledgeModelTests
         Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.LifecycleFactDto { Kind = "bad", Status = "Unknown", Subject = new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "Identified", Identifier = "x" } }.ToModel(CreateExtraction().Acquisition.Manifest.Identity));
         Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.LifecycleFactDto { Kind = "Ownership", Status = "bad", Subject = new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "Identified", Identifier = "x" } }.ToModel(CreateExtraction().Acquisition.Manifest.Identity));
         Assert.Throws<InvalidDataException>(() => new JsonKnowledgeStore.PlatformEvidenceDto { Platform = "bad", ManagedAssembly = "Present", NativeArtifact = "Unknown", Confidence = "Strong", Subject = new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "Identified", Identifier = "x" } }.ToModel(CreateExtraction().Acquisition.Manifest.Identity));
+
+        var identity = CreateExtraction().Acquisition.Manifest.Identity;
+        var subject = new JsonKnowledgeStore.NodeDto { Kind = "ManagedSymbol", Resolution = "Identified", Identifier = "x" };
+        var lifecycle = new JsonKnowledgeStore.LifecycleFactDto { Subject = subject, Kind = "Ownership", Status = "Established" }.ToModel(identity);
+        var platform = new JsonKnowledgeStore.PlatformEvidenceDto { Subject = subject, Platform = "Android", ManagedAssembly = "Present", NativeArtifact = "Unknown", Confidence = "Strong" }.ToModel(identity);
+        Assert.Equal(KnowledgeConfidence.Unknown, lifecycle.Confidence);
+        Assert.Equal(PlatformRuntimeStatus.NotValidated, platform.Runtime);
     }
 
     private static PackageExtractionResult CreateExtraction()

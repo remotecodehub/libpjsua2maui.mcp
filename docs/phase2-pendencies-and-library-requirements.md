@@ -2,7 +2,7 @@
 
 > Atualização de 15/10/2026: este relatório foi produzido contra a baseline histórica `2.17.0.4`. A baseline mínima atual para source inspection é `libpjsua2maui >= 2.17.0.5`; consulte `docs/package-knowledge.md` e `docs/libpjsua2maui-source.md` para o estado atualizado. As conclusões sobre ausência de fontes no pacote abaixo não se aplicam à `2.17.0.5`.
 
-> Estado da implementação: a versão `2.17.0.5` foi inspecionada e o extrator agora indexa os fontes C# gerados pelo SWIG, wrappers C++ e headers publicados. O produtor está fixado localmente em `7dfdd229f944b5f236b27cc19cdc97c3cf717567`, com pjproject em `5a457451fa2712ba18e12b01738e8ff3af2b26fd`. As pendências remanescentes são relações nativas que continuam parciais ou desconhecidas quando o pacote não contém a implementação pjproject correspondente; elas não devem ser tratadas como ausência de artefato.
+> Estado da implementação: a versão normativa `2.17.0.5` foi inspecionada e o extrator agora indexa os fontes C# gerados pelo SWIG, wrappers C++ e headers publicados. O produtor está fixado localmente em `7dfdd229f944b5f236b27cc19cdc97c3cf717567`, com pjproject em `5a457451fa2712ba18e12b01738e8ff3af2b26fd`. O hardening final também cobre chamadas C++ qualificadas por namespace, associa lifecycle facts ao tipo gerado e registra diagnósticos de construções não interpretadas. Relações parciais/desconhecidas restantes representam limitações reais de evidência, não falhas silenciosas do parser.
 
 ## 1. Objetivo e escopo
 
