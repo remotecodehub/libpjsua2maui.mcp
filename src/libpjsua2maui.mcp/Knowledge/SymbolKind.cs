@@ -11,9 +11,12 @@ public enum SymbolKind
     Interface,
     Enum,
     Delegate,
+    Record,
+    OtherType,
     Method,
     Constructor,
     Property,
     Event,
-    Field
+    Field,
+    Operator
 }

@@ -80,7 +80,7 @@ public sealed class KnowledgeIndexer : IKnowledgeIndexer
             evidence => $"{evidence.KnowledgeSet}|{evidence.Subject}|{evidence.Platform}|{evidence.TargetFramework}|{evidence.RuntimeIdentifier}|{evidence.ManagedAssembly}|{evidence.NativeArtifact}|{evidence.ManagedSource}|{evidence.NativeSource}|{evidence.NativeHeader}|{evidence.Runtime}|{string.Join(';', evidence.ArtifactPaths)}|{evidence.Confidence}|{evidence.Provenance}|{evidence.Limitations}",
             "platform evidence");
 
-        return Task.FromResult(new IndexedKnowledgeSet(manifest, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence));
+        return Task.FromResult(new IndexedKnowledgeSet(manifest, symbols, documentation, associations, unassociated, relationships, lifecycleFacts, platformEvidence, extraction.Inventory));
     }
 
     private static IReadOnlyList<T> SortAndValidate<T>(IEnumerable<T> values, Func<T, string> key, Func<T, string> fingerprint, string name)

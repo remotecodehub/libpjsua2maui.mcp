@@ -256,7 +256,12 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
                 var genericSuffix = method.GetGenericParameters().Count == 0 ? string.Empty : new string((char)96, 2) + method.GetGenericParameters().Count;
                 var documentationId = $"M:{typeName}.{xmlName}{genericSuffix}({parameterTypes})";
                 var qualifiedName = $"{typeName}.{xmlName}({parameterTypes})";
-                yield return Create(acquisition, artifact, qualifiedName, methodName is ".ctor" or ".cctor" ? SymbolKind.Constructor : SymbolKind.Method, documentationId, qualifiedName, parameters, signature.ReturnType);
+                var methodKind = methodName is ".ctor" or ".cctor"
+                    ? SymbolKind.Constructor
+                    : methodName.StartsWith("op_", StringComparison.Ordinal)
+                        ? SymbolKind.Operator
+                        : SymbolKind.Method;
+                yield return Create(acquisition, artifact, qualifiedName, methodKind, documentationId, qualifiedName, parameters, signature.ReturnType, typeName, (method.Attributes & MethodAttributes.Static) != 0);
             }
 
             foreach (var propertyHandle in definition.GetProperties())
@@ -269,7 +274,8 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
                 }
 
                 var qualifiedName = $"{typeName}.{name}";
-                yield return Create(acquisition, artifact, qualifiedName, SymbolKind.Property, $"P:{qualifiedName}", qualifiedName);
+                var isStatic = IsPropertyStatic(reader, property.GetAccessors());
+                yield return Create(acquisition, artifact, qualifiedName, SymbolKind.Property, $"P:{qualifiedName}", qualifiedName, declaringType: typeName, isStatic: isStatic);
             }
 
             foreach (var eventHandle in definition.GetEvents())
@@ -282,7 +288,8 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
                 }
 
                 var qualifiedName = $"{typeName}.{name}";
-                yield return Create(acquisition, artifact, qualifiedName, SymbolKind.Event, $"E:{qualifiedName}", qualifiedName);
+                var isStatic = IsEventStatic(reader, @event.GetAccessors());
+                yield return Create(acquisition, artifact, qualifiedName, SymbolKind.Event, $"E:{qualifiedName}", qualifiedName, declaringType: typeName, isStatic: isStatic);
             }
 
             foreach (var fieldHandle in definition.GetFields())
@@ -295,7 +302,7 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
 
                 var name = reader.GetString(field.Name);
                 var qualifiedName = $"{typeName}.{name}";
-                yield return Create(acquisition, artifact, qualifiedName, SymbolKind.Field, $"F:{qualifiedName}", qualifiedName);
+                yield return Create(acquisition, artifact, qualifiedName, SymbolKind.Field, $"F:{qualifiedName}", qualifiedName, declaringType: typeName, isStatic: (field.Attributes & FieldAttributes.Static) != 0);
             }
         }
     }
@@ -315,9 +322,9 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         }
     }
 
-    private static SymbolRepresentation Create(PackageAcquisitionResult acquisition, PackageArtifact artifact, string name, SymbolKind kind, string documentationId, string signature, IReadOnlyList<SymbolParameter>? parameters = null, string? returnType = null)
+    private static SymbolRepresentation Create(PackageAcquisitionResult acquisition, PackageArtifact artifact, string name, SymbolKind kind, string documentationId, string signature, IReadOnlyList<SymbolParameter>? parameters = null, string? returnType = null, string? declaringType = null, bool isStatic = false)
     {
-        return new SymbolRepresentation(acquisition.Manifest.Package, acquisition.Manifest.PackageVersion, new SymbolIdentity(name, kind), artifact.TargetFramework, artifact, documentationId, signature, parameters, returnType);
+        return new SymbolRepresentation(acquisition.Manifest.Package, acquisition.Manifest.PackageVersion, new SymbolIdentity(name, kind), artifact.TargetFramework, artifact, documentationId, signature, parameters, returnType, declaringType: declaringType, isStatic: isStatic);
     }
 
     private static bool IsPublicType(MetadataReader reader, TypeDefinitionHandle handle, TypeDefinition definition)
@@ -361,6 +368,11 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
         }
 
         var baseName = definition.BaseType.IsNil ? null : GetTypeName(reader, definition.BaseType);
+        if (baseName is not null && HasRecordShape(reader, definition))
+        {
+            return SymbolKind.Record;
+        }
+
         return baseName switch
         {
             "System.Enum" => SymbolKind.Enum,
@@ -369,6 +381,21 @@ public sealed class PackageKnowledgeExtractor : IPackageKnowledgeExtractor
             _ => SymbolKind.Class
         };
     }
+
+    private static bool HasRecordShape(MetadataReader reader, TypeDefinition definition)
+    {
+        return definition.GetProperties().Any(handle => reader.GetString(reader.GetPropertyDefinition(handle).Name) == "EqualityContract") ||
+            definition.GetMethods().Any(handle => reader.GetString(reader.GetMethodDefinition(handle).Name) == "PrintMembers");
+    }
+
+    private static bool IsPropertyStatic(MetadataReader reader, PropertyAccessors accessors) =>
+        IsStatic(reader, accessors.Getter) || IsStatic(reader, accessors.Setter);
+
+    private static bool IsEventStatic(MetadataReader reader, EventAccessors accessors) =>
+        IsStatic(reader, accessors.Adder) || IsStatic(reader, accessors.Remover) || IsStatic(reader, accessors.Raiser);
+
+    private static bool IsStatic(MetadataReader reader, MethodDefinitionHandle handle) =>
+        !handle.IsNil && (reader.GetMethodDefinition(handle).Attributes & MethodAttributes.Static) != 0;
 
     private static string GetTypeName(MetadataReader reader, TypeDefinitionHandle handle)
     {

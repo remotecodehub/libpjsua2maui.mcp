@@ -43,7 +43,7 @@
     <ProjectReference Include="..\..\src\libpjsua2maui.mcp\libpjsua2maui.mcp.csproj" />
   </ItemGroup>
 
-  <Target Name="QualityGate" DependsOnTargets="Build">
+  <Target Name="QualityGate" Condition="'$(CI)' == 'true' Or '$(GITHUB_ACTIONS)' == 'true' Or '$(TF_BUILD)' == 'true'" DependsOnTargets="Build">
     <Message Importance="High" Text="============================================================" />
     <Message Importance="High" Text="libpjsua2maui.mcp Unit Test Quality Gate (en-US)" />
     <Message Importance="High" Text="============================================================" />
@@ -148,7 +148,7 @@
     in the local environment. It preserves the same configured threshold and
     validates line, branch, and method coverage from the generated report.
   -->
-  <Target Name="QualityGateExecutable" DependsOnTargets="Build">
+  <Target Name="QualityGateExecutable" Condition="'$(CI)' == 'true' Or '$(GITHUB_ACTIONS)' == 'true' Or '$(TF_BUILD)' == 'true'" DependsOnTargets="Build">
     <Message Importance="High" Text="============================================================" />
     <Message Importance="High" Text="libpjsua2maui.mcp Executable Quality Gate (en-US)" />
     <Message Importance="High" Text="============================================================" />

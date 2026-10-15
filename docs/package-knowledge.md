@@ -122,3 +122,14 @@ The persistence model carries managed-to-SWIG, native and platform evidence with
 ## Offline mode
 
 The stdio host must support a pre-indexed package knowledge set so normal agent queries do not require Internet access. Acquisition may be a separate setup/update operation. The HTTP image may ship a known version or build its index during image creation; runtime network access should not be required for ordinary queries.
+## Phase 2A inventory
+
+The extractor now creates `PackageSymbolInventory` from the public metadata observations. Its global identity is package/version plus the canonical assembly name, symbol kind, fully qualified symbol name, and canonical signature. TFM-specific assembly, XML, and generated-source observations are retained as `InventoryEvidence`; they do not create additional global denominator entries.
+
+Types include classes, records, structs, enums, delegates, interfaces, and other metadata types. Members include constructors, methods, properties, fields, events, and operators. Method signatures retain parameter types, so overloads remain distinct. Static status is read from metadata accessors, fields, and methods.
+
+Inventory items carry `InspectionStatus`, preliminary `SymbolOrigin`, XML documentation identity, source-artifact paths, and package provenance. `Partial` records missing XML or generated-source evidence with an explicit reason. `UnknownOrigin` is used when the available artifacts do not safely establish an origin; no SWIG/native mapping is inferred by name.
+
+`InventoryCounters` is the immutable denominator and `InventoryCompletenessReport` reports type/member inspection percentages plus source/XML gaps. This is evidence coverage and is independent from test-code coverage. The inventory is ordinal-sorted by its readable identity and is deduplicated before counters are calculated.
+
+For baseline package inspection, package evidence was checked against `libpjsua2maui` `2.17.0.5`: the published package contains four managed TFMs, per-TFM XML for each managed assembly, generated source under `src/`, and platform native assets under `runtimes/`. These package entries remain distinct from the pinned `/lib` source-submodule evidence. Native runtime execution and Phase 2B--2E mapping remain outside this increment.

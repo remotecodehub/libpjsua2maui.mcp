@@ -15,7 +15,9 @@ public sealed record SymbolRepresentation
         string? signature = null,
         IReadOnlyList<SymbolParameter>? parameters = null,
         string? returnType = null,
-        FactProvenance? provenance = null)
+        FactProvenance? provenance = null,
+        string? declaringType = null,
+        bool isStatic = false)
     {
         Package = package ?? throw new ArgumentNullException(nameof(package));
         PackageVersion = packageVersion ?? throw new ArgumentNullException(nameof(packageVersion));
@@ -26,6 +28,8 @@ public sealed record SymbolRepresentation
         Signature = string.IsNullOrWhiteSpace(signature) ? null : signature;
         Parameters = Array.AsReadOnly((parameters ?? []).ToArray());
         ReturnType = string.IsNullOrWhiteSpace(returnType) ? null : returnType;
+        DeclaringType = string.IsNullOrWhiteSpace(declaringType) ? InferDeclaringType(identity, identity.Kind) : declaringType;
+        IsStatic = isStatic;
         Provenance = provenance;
 
         if (sourceArtifact is not null &&
@@ -59,5 +63,20 @@ public sealed record SymbolRepresentation
 
     public string? ReturnType { get; }
 
+    public string DeclaringType { get; }
+
+    public bool IsStatic { get; }
+
     public FactProvenance? Provenance { get; }
+
+    private static string InferDeclaringType(SymbolIdentity identity, SymbolKind kind)
+    {
+        if (kind is SymbolKind.Class or SymbolKind.Struct or SymbolKind.Interface or SymbolKind.Enum or SymbolKind.Delegate or SymbolKind.Record or SymbolKind.OtherType)
+        {
+            return identity.QualifiedName;
+        }
+
+        var separator = identity.QualifiedName.IndexOf('.', StringComparison.Ordinal);
+        return separator < 0 ? identity.QualifiedName : identity.QualifiedName[..separator];
+    }
 }

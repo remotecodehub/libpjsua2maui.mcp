@@ -44,13 +44,15 @@ Status legend: `[ ]` planned, `[~]` in progress, `[x]` complete.
 
 ### Phase 2A — Evidence universe and exhaustive inventory
 
+Phase 2A is complete. The deterministic inventory model, metadata classification, TFM evidence deduplication, XML/source correlation, counters, and focused tests passed the manual validation procedure outside the sandbox. Phase 2B--2E remain pending.
+
 - [x] Inspect generated SWIG artifacts available from the package/repository. Baseline `2.17.0.5` publishes generated C#, C++ and headers; the producer tag and pjproject gitlink are recorded separately.
-- [ ] Establish the complete deterministic package symbol universe and immutable denominators for all relevant types and members.
-- [ ] Inventory classes, records, structs, enums, delegates, interfaces and other relevant metadata symbols with origin/provenance.
-- [ ] Inventory relevant constructors, properties, fields, methods, events, operators, static members and inherited/publicly exposed members.
-- [ ] Correlate package metadata, XML documentation, TFM/platform evidence and generated source into one deterministic inventory without double-counting.
-- [ ] Add an explicit inspection status for every inventory item (`NotInspected`, `Inspected`, `Mapped`, `Partial`, `Unknown`, `NotApplicable`, `Unparsed` or equivalent deterministic states).
-- [ ] Add deterministic inventory counters and an evidence-closure report that can prove whether every relevant package symbol was considered.
+- [x] Establish the complete deterministic package symbol universe and immutable denominators for all relevant types and members.
+- [x] Inventory classes, records, structs, enums, delegates, interfaces and other relevant metadata symbols with origin/provenance.
+- [x] Inventory relevant constructors, properties, fields, methods, events, operators, static members and inherited/publicly exposed members.
+- [x] Correlate package metadata, XML documentation, TFM/platform evidence and generated source into one deterministic inventory without double-counting.
+- [x] Add an explicit inspection status for every inventory item (`NotInspected`, `Inspected`, `Mapped`, `Partial`, `Unknown`, `NotApplicable`, `Unparsed` or equivalent deterministic states).
+- [x] Add deterministic inventory counters and an evidence-closure report that can prove whether every relevant package symbol was considered.
 
 ### Phase 2B — Exhaustive managed-to-SWIG mapping
 

@@ -13,7 +13,8 @@ public sealed record IndexedKnowledgeSet
         IReadOnlyList<DocumentationRecord> unassociatedDocumentation,
         IReadOnlyList<KnowledgeRelationship>? relationships = null,
         IReadOnlyList<LifecycleFact>? lifecycleFacts = null,
-        IReadOnlyList<PlatformEvidence>? platformEvidence = null)
+        IReadOnlyList<PlatformEvidence>? platformEvidence = null,
+        PackageSymbolInventory? inventory = null)
     {
         Manifest = manifest ?? throw new ArgumentNullException(nameof(manifest));
         Symbols = Copy(symbols, nameof(symbols));
@@ -23,6 +24,9 @@ public sealed record IndexedKnowledgeSet
         Relationships = Copy(relationships ?? [], nameof(relationships));
         LifecycleFacts = Copy(lifecycleFacts ?? [], nameof(lifecycleFacts));
         PlatformEvidence = Copy(platformEvidence ?? [], nameof(platformEvidence));
+        Inventory = inventory ?? PackageSymbolInventoryBuilder.Build(new PackageExtractionResult(
+            new PackageAcquisitionResult(manifest.Artifacts.FirstOrDefault()?.RelativePath ?? "indexed-knowledge", manifest, new PackageDocumentationValidation(manifest.PackageVersion, new Dictionary<string, string>(), [], [])),
+            Symbols, Documentation, Associations, UnassociatedDocumentation, Relationships, LifecycleFacts, PlatformEvidence));
 
         if (manifest.Status != KnowledgeManifestStatus.Indexed)
         {
@@ -38,6 +42,7 @@ public sealed record IndexedKnowledgeSet
     public IReadOnlyList<KnowledgeRelationship> Relationships { get; }
     public IReadOnlyList<LifecycleFact> LifecycleFacts { get; }
     public IReadOnlyList<PlatformEvidence> PlatformEvidence { get; }
+    public PackageSymbolInventory Inventory { get; }
 
     private static IReadOnlyList<T> Copy<T>(IReadOnlyList<T> values, string parameterName)
     {

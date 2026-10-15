@@ -35,21 +35,26 @@ Tools should answer focused agent questions rather than expose arbitrary file-sy
 
 Core query and parsing behavior must be unit tested. Include version/platform cases. Host tests should verify MCP registration and transport behavior. Tests must not require unavailable native Android/iOS/macOS binaries merely to validate package metadata behavior.
 
-### Mandatory coverage quality gate
+### Mandatory coverage validation
 
-Before invoking repository-local .NET tools, run `dotnet tool restore` from the repository root. First try the canonical target:
+Before invoking repository-local .NET tools, run `dotnet tool restore` from the repository root. Local validation is manual: build the test project, execute its generated `.exe` with `dotnet test`, generate Cobertura summaries with ReportGenerator, and inspect line, branch, and method percentages. The test project's `QualityGate` and `QualityGateExecutable` targets are CI-only enforcement targets.
+
+```powershell
+dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release
+dotnet test ./tests/libpjsua2maui.mcp.tests/bin/Release/net10.0/libpjsua2maui.mcp.tests.exe -- --report-trx --report-trx-filename test-results.trx --results-directory ./tests/libpjsua2maui.mcp.tests/TestResults/QualityGate --coverlet --coverlet-output-format cobertura
+dotnet tool run reportgenerator -reports:"./tests/libpjsua2maui.mcp.tests/TestResults/QualityGate/coverage.cobertura.*.xml" -targetdir:"./tests/libpjsua2maui.mcp.tests/TestResults/QualityGate/Report" -reporttypes:"MarkdownSummary;TextSummary" -classfilters:"+libpjsua2maui.mcp*;-Program"
+```
+
+In CI, invoke both CI-only targets to enforce the same threshold:
 
 ```powershell
 dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGate
+dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGateExecutable
 ```
-
-If an environment/MSBuild problem prevents invoking this target, retain it unchanged and use the supplemental executable-based path:
-- Resolve the generated test executable path from the build output and run `dotnet test <path-to-test-executable>` to verify tests and Cobertura XML generation.
-- Run `dotnet build ./tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj -c Release -t:QualityGateExecutable` to generate `Summary.txt` and `Summary.md` and validate line, branch, and method coverage.
 
 Both targets use the configured threshold (90% by default). The supplemental target must fail if tests fail, coverage reports are missing/unparseable, or any coverage dimension is below threshold. Report exact commands, exit statuses, actual percentages, and report locations. Do not lower the threshold, exclude relevant production code, or treat a direct test run as a passing gate.
 
-If execution is blocked by environment/tooling limitations, report the exact command and complete relevant diagnostic to the user and pause until the user adjusts the target and signals that implementation may resume.
+The generated test executable must be run outside the filesystem/process sandbox when the runner requires named pipes, IPC, child processes, or other host capabilities restricted by the sandbox. If execution is blocked, report the exact command, complete relevant diagnostic, whether tests ran, and whether coverage XML was produced. A zero-test result is not validation.
 
 ## Dependencies
 
