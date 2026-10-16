@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <AssemblyMetadata Include="RepositoryRoot" Value="$(MSBuildProjectDirectory)/../.." />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\libpjsua2maui.mcp.stdio\libpjsua2maui.mcp.stdio.csproj" />
+    <ProjectReference Include="..\..\src\libpjsua2maui.mcp.http\libpjsua2maui.mcp.http.csproj" />
+    <ProjectReference Include="..\..\src\libpjsua2maui.mcp\libpjsua2maui.mcp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
+  </ItemGroup>
+
+</Project>

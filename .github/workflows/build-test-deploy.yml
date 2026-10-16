@@ -23,7 +23,7 @@ env:
   HTTP_PROJECT: src/libpjsua2maui.mcp.http/libpjsua2maui.mcp.http.csproj
   STDIO_PROJECT: src/libpjsua2maui.mcp.stdio/libpjsua2maui.mcp.stdio.csproj
   IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/libpjsua2maui.mcp.http
-  TEST_RESULTS_DIR: ${{ github.workspace }}/tests/libpjsua2maui.mcp.tests/TestResults
+  TEST_RESULTS_DIR: ${{ github.workspace }}/tests/libpjsua2maui.mcp.unittests/TestResults
 
 jobs:
   build:
@@ -197,9 +197,9 @@ jobs:
           else { Add-Content -Path $summaryFile -Value "`nCoverage Markdown report was not generated: $markdownReport" }
           if (Test-Path $textReport) {
             Add-Content -Path $summaryFile -Value "`n<details><summary>Coverage report (text)</summary>`n"
-            Add-Content -Path $summaryFile -Value "`n```text"
+            Add-Content -Path $summaryFile -Value "`n``````text"
             Get-Content -Path $textReport | Add-Content -Path $summaryFile
-            Add-Content -Path $summaryFile -Value '```'
+            Add-Content -Path $summaryFile -Value '``````'
             Add-Content -Path $summaryFile -Value '</details>'
           }
           

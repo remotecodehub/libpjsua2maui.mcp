@@ -5,6 +5,7 @@
     <Project Path="src/libpjsua2maui.mcp/libpjsua2maui.mcp.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/libpjsua2maui.mcp.tests/libpjsua2maui.mcp.tests.csproj" />
+    <Project Path="tests/libpjsua2maui.mcp.integrationtests/libpjsua2maui.mcp.integrationtests.csproj" />
+    <Project Path="tests/libpjsua2maui.mcp.unittests/libpjsua2maui.mcp.unittests.csproj" />
   </Folder>
 </Solution>
